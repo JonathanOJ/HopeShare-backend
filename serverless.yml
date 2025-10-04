@@ -1,0 +1,151 @@
+org: hopeshare
+app: serverless-crud
+service: serverless-crud
+frameworkVersion: "4"
+
+custom:
+  usersTableName: hopeshare-users
+  campanhaTableName: hopeshare-campanha
+  depositRequestTableName: hopeshare-deposit-request
+  validationUserTableName: hopeshare-validation-user
+  donationTableName: hopeshare-donation
+  reportsTableName: hopeshare-reports
+  configPaymentTableName: hopeshare-config-payment
+  bankTableName: hopeshare-bank
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [UsersTable, Arn]
+            - Fn::GetAtt: [CampanhaTable, Arn]
+            - Fn::GetAtt: [DepositRequestTable, Arn]
+            - Fn::GetAtt: [ValidationUserTable, Arn]
+            - Fn::GetAtt: [DonationTable, Arn]
+            - Fn::GetAtt: [ReportsTable, Arn]
+            - Fn::GetAtt: [ConfigPaymentTable, Arn]
+            - Fn::GetAtt: [BankTable, Arn]
+  environment:
+    USERS_TABLE: ${self:custom.usersTableName}
+    CAMPANHA_TABLE: ${self:custom.campanhaTableName}
+    DEPOSIT_REQUEST_TABLE: ${self:custom.depositRequestTableName}
+    VALIDATION_USER_TABLE: ${self:custom.validationUserTableName}
+    DONATION_TABLE: ${self:custom.donationTableName}
+    REPORTS_TABLE: ${self:custom.reportsTableName}
+    CONFIG_PAYMENT_TABLE: ${self:custom.configPaymentTableName}
+    BANK_TABLE: ${self:custom.bankTableName}
+
+functions:
+  api:
+    handler: src/handler.handler
+    events:
+      - httpApi: "*"
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: user_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: user_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.usersTableName}
+
+    CampanhaTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: campanha_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: campanha_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.campanhaTableName}
+
+    DepositRequestTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: request_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: request_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.depositRequestTableName}
+
+    ValidationUserTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: validation_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: validation_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.validationUserTableName}
+
+    DonationTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: donation_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: donation_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.donationTableName}
+
+    ReportsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: report_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: report_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.reportsTableName}
+
+    ConfigPaymentTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: config_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: config_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.configPaymentTableName}
+
+    BankTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: bank_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: bank_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.bankTableName}
