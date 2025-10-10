@@ -10,7 +10,7 @@ custom:
   validationUserTableName: hopeshare-validation-user
   donationTableName: hopeshare-donation
   reportsTableName: hopeshare-reports
-  configPaymentTableName: hopeshare-config-payment
+  configReceiptTableName: hopeshare-config-receipt
   bankTableName: hopeshare-bank
 
 provider:
@@ -34,7 +34,7 @@ provider:
             - Fn::GetAtt: [ValidationUserTable, Arn]
             - Fn::GetAtt: [DonationTable, Arn]
             - Fn::GetAtt: [ReportsTable, Arn]
-            - Fn::GetAtt: [ConfigPaymentTable, Arn]
+            - Fn::GetAtt: [ConfigReceiptTable, Arn]
             - Fn::GetAtt: [BankTable, Arn]
   environment:
     USERS_TABLE: ${self:custom.usersTableName}
@@ -43,8 +43,20 @@ provider:
     VALIDATION_USER_TABLE: ${self:custom.validationUserTableName}
     DONATION_TABLE: ${self:custom.donationTableName}
     REPORTS_TABLE: ${self:custom.reportsTableName}
-    CONFIG_PAYMENT_TABLE: ${self:custom.configPaymentTableName}
+    CONFIG_RECEIPT_TABLE: ${self:custom.configReceiptTableName}
     BANK_TABLE: ${self:custom.bankTableName}
+    # Cloudflare R2 (S3-compatible) - Use Serverless Dashboard variables ou AWS Systems Manager Parameter Store
+    CLOUDFLARE_R2_ACCOUNT_ID: ${param:CLOUDFLARE_R2_ACCOUNT_ID}
+    CLOUDFLARE_R2_ACCESS_KEY_ID: ${param:CLOUDFLARE_R2_ACCESS_KEY_ID}
+    CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${param:CLOUDFLARE_R2_SECRET_ACCESS_KEY}
+    CLOUDFLARE_R2_BUCKET_NAME: ${param:CLOUDFLARE_R2_BUCKET_NAME}
+    CLOUDFLARE_R2_ENDPOINT: ${param:CLOUDFLARE_R2_ENDPOINT}
+    # Mercado Pago
+    MERCADO_PAGO_ACCESS_TOKEN: ${param:MERCADO_PAGO_ACCESS_TOKEN}
+    MERCADO_PAGO_PUBLIC_KEY: ${param:MERCADO_PAGO_PUBLIC_KEY}
+    # URLs
+    API_URL: ${param:API_URL}
+    FRONTEND_URL: ${param:FRONTEND_URL}
 
 functions:
   api:
@@ -106,10 +118,10 @@ resources:
       Type: AWS::DynamoDB::Table
       Properties:
         AttributeDefinitions:
-          - AttributeName: donation_id
+          - AttributeName: payment_id
             AttributeType: S
         KeySchema:
-          - AttributeName: donation_id
+          - AttributeName: payment_id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.donationTableName}
@@ -126,17 +138,17 @@ resources:
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.reportsTableName}
 
-    ConfigPaymentTable:
+    ConfigReceiptTable:
       Type: AWS::DynamoDB::Table
       Properties:
         AttributeDefinitions:
-          - AttributeName: config_id
+          - AttributeName: receipt_id
             AttributeType: S
         KeySchema:
-          - AttributeName: config_id
+          - AttributeName: receipt_id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-        TableName: ${self:custom.configPaymentTableName}
+        TableName: ${self:custom.configReceiptTableName}
 
     BankTable:
       Type: AWS::DynamoDB::Table

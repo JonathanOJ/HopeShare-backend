@@ -14,7 +14,6 @@ const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
 
 const USERS_TABLE = process.env.USERS_TABLE;
 
-// Buscar usuário por email
 const findByEmail = async (email) => {
   const params = {
     TableName: USERS_TABLE,
@@ -34,7 +33,42 @@ const findByEmail = async (email) => {
   }
 };
 
-// Login do usuário
+const findByCpf = async (cpf) => {
+  const params = {
+    TableName: USERS_TABLE,
+    KeyConditionExpression: "cpf = :cpf",
+    ExpressionAttributeValues: {
+      ":cpf": cpf,
+    },
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new QueryCommand(params));
+    return result.Items?.[0] || null;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
+const findByCnpj = async (cnpj) => {
+  const params = {
+    TableName: USERS_TABLE,
+    KeyConditionExpression: "cnpj = :cnpj",
+    ExpressionAttributeValues: {
+      ":cnpj": cnpj,
+    },
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new QueryCommand(params));
+    return result.Items?.[0] || null;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
 const signIn = async (user) => {
   const { email, password } = user;
 
@@ -56,7 +90,6 @@ const signIn = async (user) => {
   }
 };
 
-// Buscar usuário por ID
 const findById = async (user_id) => {
   const params = {
     TableName: USERS_TABLE,
@@ -72,9 +105,9 @@ const findById = async (user_id) => {
   }
 };
 
-// Criar novo usuário
 const createUser = async (user) => {
-  const { username, email, image, password, cnpj, birthdate } = user;
+  const { username, email, image, password, cnpj, cpf, birthdate, type_user } =
+    user;
   const dateUTC = new Date().toISOString();
   const newId = Date.now().toString();
 
@@ -86,13 +119,15 @@ const createUser = async (user) => {
       email,
       image,
       password,
-      cnpj,
+      cnpj: cnpj || null,
+      cpf: cpf || null,
       birthdate,
       total_donated: 0,
       total_campanha_donated: 0,
       total_campanha_created: 0,
       created_at: dateUTC,
-      admin: false, // Default value
+      type_user,
+      admin: false,
     },
   };
 
@@ -103,9 +138,9 @@ const createUser = async (user) => {
       username,
       email,
       image,
-      cnpj,
       birthdate,
-      admin,
+      admin: false,
+      type_user,
     };
   } catch (error) {
     console.error(error);
@@ -113,7 +148,6 @@ const createUser = async (user) => {
   }
 };
 
-// Deletar usuário
 const deleteUser = async (user_id) => {
   const params = {
     TableName: USERS_TABLE,
@@ -132,7 +166,17 @@ const deleteUser = async (user_id) => {
 
 // Atualizar dados do usuário
 const updateUser = async (user) => {
-  const { user_id, username, email, image, password, cnpj, birthdate } = user;
+  const {
+    user_id,
+    username,
+    email,
+    image,
+    password,
+    cnpj,
+    cpf,
+    birthdate,
+    type_user,
+  } = user;
 
   const params = {
     TableName: USERS_TABLE,
@@ -143,14 +187,18 @@ const updateUser = async (user) => {
       image = :image,
       password = :password,
       cnpj = :cnpj,
-      birthdate = :birthdate`,
+      cpf = :cpf,
+      birthdate = :birthdate,
+      type_user = :type_user`,
     ExpressionAttributeValues: {
       ":username": username,
       ":email": email,
       ":image": image,
       ":password": password,
       ":cnpj": cnpj,
+      ":cpf": cpf,
       ":birthdate": birthdate,
+      ":type_user": type_user,
     },
     ReturnValues: "UPDATED_NEW",
   };
@@ -262,4 +310,6 @@ module.exports = {
   updateUserCampanhaCreated,
   updateTotalDonated,
   getDetailsCampanhasByUsuarioId,
+  findByCnpj,
+  findByCpf,
 };

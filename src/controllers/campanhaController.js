@@ -105,6 +105,75 @@ const donate = async (req, res) => {
   }
 };
 
+// Add, Get, Delete Comments
+const addComment = async (req, res) => {
+  const { campanha_id } = req.params;
+
+  const { user_id, comment } = req.body;
+
+  if (!user_id || !comment) {
+    return res.status(400).json({ error: "Missing user_id or comment" });
+  }
+
+  try {
+    const user = await userModel.findById(user_id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const result = await campanhaModel.addComment(campanha_id, user, comment);
+    res.status(200).json(result.Attributes);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not add comment" });
+  }
+};
+
+const getComments = async (req, res) => {
+  const { campanha_id } = req.params;
+
+  try {
+    const result = await campanhaModel.getComments(campanha_id);
+    res.status(200).json(result.Attributes);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not retrieve comments" });
+  }
+};
+
+const deleteComment = async (req, res) => {
+  const { campanha_id, comment_id } = req.params;
+
+  try {
+    const result = await campanhaModel.deleteComment(campanha_id, comment_id);
+    res.status(200).json({ success: result.Attributes ? true : false });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not delete comment" });
+  }
+};
+
+// Admin
+const updateStatusCampanha = async (req, res) => {
+  const { campanha_id, user_id, status } = req.params;
+
+  const adminUser = await userModel.findById(user_id);
+  if (!adminUser || !adminUser.isAdmin) {
+    return res.status(403).json({ error: "Access denied" });
+  }
+
+  try {
+    const result = await campanhaModel.updateStatusCampanha(
+      campanha_id,
+      status
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not change campanha status" });
+  }
+};
+
 module.exports = {
   searchCampanhas,
   findById,
@@ -112,4 +181,8 @@ module.exports = {
   saveCampanha,
   deleteCampanha,
   donate,
+  addComment,
+  getComments,
+  deleteComment,
+  updateStatusCampanha,
 };

@@ -17,6 +17,11 @@ const findById = async (campanha_id) => {
   const params = {
     TableName: CAMPANHA_TABLE,
     Key: { campanha_id },
+    ProjectionExpression:
+      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address_street, address_number, address_complement, address_city, address_state, address_zipcode, address_neighborhood, have_address",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
   };
 
   try {
@@ -34,6 +39,11 @@ const findAllByUser = async (user_id) => {
     FilterExpression: "user_responsable.user_id = :user_id",
     ExpressionAttributeValues: {
       ":user_id": user_id,
+    },
+    ProjectionExpression:
+      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address_street, address_number, address_complement, address_city, address_state, address_zipcode, address_neighborhood, have_address",
+    ExpressionAttributeNames: {
+      "#status": "status",
     },
   };
 
@@ -53,6 +63,11 @@ const searchCampanhas = async (searchBody) => {
   const params = {
     TableName: CAMPANHA_TABLE,
     Limit: itemsPerPage,
+    ProjectionExpression:
+      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address_street, address_number, address_complement, address_city, address_state, address_zipcode, address_neighborhood, have_address",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
   };
 
   const filterExpressions = [];
@@ -81,32 +96,6 @@ const searchCampanhas = async (searchBody) => {
     return null;
   }
 };
-
-// export interface Campanha {
-//   campanha_id: string;
-//   title: string;
-//   description: string;
-//   image: string;
-//   category: string[];
-//   categoriesFormatted: string;
-//   users_donated: UserDonatedModel[];
-//   value_required: number;
-//   value_donated: number;
-//   request_emergency: boolean;
-//   emergency: boolean;
-//   user_responsable: AuthUser;
-//   created_at: Date | null;
-//   progress_percentage?: number;
-//   status: StatusCampanha;
-//   address_street: string;
-//   address_number: string;
-//   address_complement: string;
-//   address_city: string;
-//   address_state: string;
-//   address_zipcode: string;
-//   address_neighborhood: string;
-//   have_address: boolean;
-// }
 
 const createCampanha = async (campanha) => {
   const dateUTC = new Date().toISOString();
@@ -146,14 +135,14 @@ const createCampanha = async (campanha) => {
       user_responsable,
       created_at: dateUTC,
       status,
-      address_street,
-      address_number,
-      address_complement,
-      address_city,
-      address_state,
-      address_zipcode,
-      address_neighborhood,
-      have_address,
+      address_street: address_street || null,
+      address_number: address_number || null,
+      address_complement: address_complement || null,
+      address_city: address_city || null,
+      address_state: address_state || null,
+      address_zipcode: address_zipcode || null,
+      address_neighborhood: address_neighborhood || null,
+      have_address: have_address,
     },
   };
 
@@ -209,39 +198,138 @@ const deleteCampanha = async (campanha_id) => {
   }
 };
 
-const donate = async (donation) => {
-  const { campanha_id, donated_value } = donation;
-
-  const appendDonationParams = {
+const updateStatusCampanha = async (campanha_id, status) => {
+  const params = {
     TableName: CAMPANHA_TABLE,
     Key: { campanha_id },
-    UpdateExpression:
-      "SET users_donated = list_append(users_donated, :donation)",
+    UpdateExpression: "SET status = :status",
     ExpressionAttributeValues: {
-      ":donation": [donation],
-    },
-    ReturnValues: "ALL_NEW",
-  };
-
-  const updateTotalParams = {
-    TableName: CAMPANHA_TABLE,
-    Key: { campanha_id },
-    UpdateExpression: "SET value_donated = value_donated + :donated_value",
-    ExpressionAttributeValues: {
-      ":donated_value": donated_value,
+      ":status": status,
     },
     ReturnValues: "ALL_NEW",
   };
 
   try {
-    const result = await dynamoDbClient.send(
-      new UpdateCommand(appendDonationParams)
-    );
-    await dynamoDbClient.send(new UpdateCommand(updateTotalParams));
+    const result = await dynamoDbClient.send(new UpdateCommand(params));
     return result.Attributes;
   } catch (error) {
     console.error(error);
     return null;
+  }
+};
+
+const addComment = async (campanha_id, user, content) => {
+  try {
+    if (!user || !content) {
+      throw new Error("Usuário ou conteúdo ausente");
+    }
+
+    const getParams = {
+      TableName: CAMPANHA_TABLE,
+      Key: { campanha_id },
+    };
+
+    const campanhaData = await dynamoDbClient.send(new GetCommand(getParams));
+
+    if (!campanhaData.Item) {
+      throw new Error("Campanha não encontrada");
+    }
+
+    const saveUser = {
+      user_id: user.user_id,
+      name: user.name,
+      image: user.image || null,
+    };
+
+    const comments = campanhaData.Item.comments || [];
+    const newComment = {
+      comment_id: Date.now().toString(),
+      user: saveUser,
+      content,
+      created_at: new Date().toISOString(),
+      campanha_id,
+    };
+    comments.push(newComment);
+
+    const updateParams = {
+      TableName: CAMPANHA_TABLE,
+      Key: { campanha_id },
+      UpdateExpression: "SET comments = :comments",
+      ExpressionAttributeValues: {
+        ":comments": comments,
+      },
+      ReturnValues: "ALL_NEW",
+    };
+
+    const result = await dynamoDbClient.send(new UpdateCommand(updateParams));
+    return result;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
+const getComments = async (campanha_id) => {
+  try {
+    const getParams = {
+      TableName: CAMPANHA_TABLE,
+      Key: { campanha_id },
+      ProjectionExpression: "comments",
+    };
+
+    const campanhaData = await dynamoDbClient.send(new GetCommand(getParams));
+
+    if (!campanhaData.Item) {
+      throw new Error("Campanha não encontrada");
+    }
+
+    return { comments: campanhaData.Item.comments || [] };
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
+const deleteComment = async (campanha_id, comment_id) => {
+  try {
+    if (!comment_id) {
+      throw new Error("Missing comment_id");
+    }
+
+    const getParams = {
+      TableName: CAMPANHA_TABLE,
+      Key: { campanha_id },
+    };
+    const campanhaData = await dynamoDbClient.send(new GetCommand(getParams));
+
+    if (!campanhaData.Item) {
+      throw new Error("Campanha not found");
+    }
+
+    const comments = campanhaData.Item.comments || [];
+    const updatedComments = comments.filter(
+      (comment) => comment.comment_id !== comment_id
+    );
+
+    if (comments.length === updatedComments.length) {
+      throw new Error("Comment not found");
+    }
+
+    const updateParams = {
+      TableName: CAMPANHA_TABLE,
+      Key: { campanha_id },
+      UpdateExpression: "SET comments = :comments",
+      ExpressionAttributeValues: {
+        ":comments": updatedComments,
+      },
+      ReturnValues: "ALL_NEW",
+    };
+
+    const result = await dynamoDbClient.send(new UpdateCommand(updateParams));
+    return result;
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
 };
 
@@ -252,5 +340,8 @@ module.exports = {
   createCampanha,
   deleteCampanha,
   updateCampanha,
-  donate,
+  addComment,
+  getComments,
+  deleteComment,
+  updateStatusCampanha,
 };
