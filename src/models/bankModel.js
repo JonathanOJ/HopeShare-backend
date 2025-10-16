@@ -14,29 +14,36 @@ const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
 const BANK_TABLE = process.env.BANK_TABLE;
 
 const searchBanks = async (searchBody) => {
-  const { search, page, itemsPerPage } = searchBody;
-
-  itemsPerPage = itemsPerPage ?? 10;
-  page = page ?? 1;
+  let { search, itemsPerPage } = searchBody;
 
   const params = {
     TableName: BANK_TABLE,
-    FilterExpression: "contains(#name, :search) OR contains(bank_id, :search)",
-    ExpressionAttributeNames: {
-      "#name": "name",
-    },
-    ExpressionAttributeValues: {
-      ":search": search,
-    },
-    ProjectionExpression: "bank_id, name, fullName",
-    Limit: itemsPerPage,
-    ExclusiveStartKey:
-      page > 1 ? { bank_id: (page - 1) * itemsPerPage } : undefined,
+    ProjectionExpression: "bank_id, #name, fullName",
+  };
+
+  params.ExpressionAttributeNames = {
+    "#name": "name",
   };
 
   try {
     const result = await dynamoDbClient.send(new ScanCommand(params));
-    return result.Items || [];
+    let items = result.Items || [];
+
+    if (search && search.trim() !== "") {
+      const searchUpper = search.trim().toUpperCase();
+      items = items.filter((bank) => {
+        const nameMatch = bank.name?.toUpperCase().includes(searchUpper);
+        const fullNameMatch = bank.fullName
+          ?.toUpperCase()
+          .includes(searchUpper);
+        const bankIdMatch = bank.bank_id?.toString().includes(search.trim());
+        return nameMatch || fullNameMatch || bankIdMatch;
+      });
+    }
+
+    const limitedItems = items.slice(0, itemsPerPage);
+
+    return limitedItems;
   } catch (error) {
     console.error("Erro ao buscar bancos:", error);
     return [];

@@ -8,11 +8,16 @@ const {
   QueryCommand,
   ScanCommand,
 } = require("@aws-sdk/lib-dynamodb");
+const bcrypt = require("bcryptjs");
 
-const ddbClient = new DynamoDBClient({ region: "us-east-1" }); // ou process.env.AWS_REGION
+const ddbClient = new DynamoDBClient({ region: "us-east-1" });
 const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
 
 const USERS_TABLE = process.env.USERS_TABLE;
+const sanitizeDocument = (document) => {
+  if (!document) return null;
+  return document.replace(/\D/g, "");
+};
 
 const findByEmail = async (email) => {
   const params = {
@@ -34,11 +39,18 @@ const findByEmail = async (email) => {
 };
 
 const findByCpf = async (cpf) => {
+  const sanitizedCpf = sanitizeDocument(cpf);
+
+  if (!sanitizedCpf || sanitizedCpf.trim() === "") {
+    return null;
+  }
+
   const params = {
     TableName: USERS_TABLE,
+    IndexName: "cpf-index",
     KeyConditionExpression: "cpf = :cpf",
     ExpressionAttributeValues: {
-      ":cpf": cpf,
+      ":cpf": sanitizedCpf,
     },
   };
 
@@ -52,11 +64,18 @@ const findByCpf = async (cpf) => {
 };
 
 const findByCnpj = async (cnpj) => {
+  const sanitizedCnpj = sanitizeDocument(cnpj);
+
+  if (!sanitizedCnpj || sanitizedCnpj.trim() === "") {
+    return null;
+  }
+
   const params = {
     TableName: USERS_TABLE,
+    IndexName: "cnpj-index",
     KeyConditionExpression: "cnpj = :cnpj",
     ExpressionAttributeValues: {
-      ":cnpj": cnpj,
+      ":cnpj": sanitizedCnpj,
     },
   };
 
@@ -72,18 +91,21 @@ const findByCnpj = async (cnpj) => {
 const signIn = async (user) => {
   const { email, password } = user;
 
-  const params = {
-    TableName: USERS_TABLE,
-    FilterExpression: "email = :email AND password = :password",
-    ExpressionAttributeValues: {
-      ":email": email,
-      ":password": password,
-    },
-  };
-
   try {
-    const result = await dynamoDbClient.send(new ScanCommand(params));
-    return result.Items?.[0] || null;
+    const foundUser = await findByEmail(email);
+
+    if (!foundUser) {
+      return null;
+    }
+
+    // Compara a senha fornecida com a senha criptografada
+    const isPasswordValid = await bcrypt.compare(password, foundUser.password);
+
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    return foundUser;
   } catch (error) {
     console.error(error);
     throw error;
@@ -111,24 +133,38 @@ const createUser = async (user) => {
   const dateUTC = new Date().toISOString();
   const newId = Date.now().toString();
 
+  // Criptografa a senha
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  const item = {
+    user_id: newId,
+    username,
+    email,
+    image,
+    password: hashedPassword,
+    birthdate,
+    total_donated: 0,
+    total_campanha_donated: 0,
+    total_campanha_created: 0,
+    created_at: dateUTC,
+    type_user,
+    admin: false,
+  };
+
+  const sanitizedCpf = sanitizeDocument(cpf);
+  if (sanitizedCpf && sanitizedCpf.trim() !== "") {
+    item.cpf = sanitizedCpf;
+  }
+
+  const sanitizedCnpj = sanitizeDocument(cnpj);
+  if (sanitizedCnpj && sanitizedCnpj.trim() !== "") {
+    item.cnpj = sanitizedCnpj;
+  }
+
   const params = {
     TableName: USERS_TABLE,
-    Item: {
-      user_id: newId,
-      username,
-      email,
-      image,
-      password,
-      cnpj: cnpj || null,
-      cpf: cpf || null,
-      birthdate,
-      total_donated: 0,
-      total_campanha_donated: 0,
-      total_campanha_created: 0,
-      created_at: dateUTC,
-      type_user,
-      admin: false,
-    },
+    Item: item,
   };
 
   try {
@@ -141,6 +177,9 @@ const createUser = async (user) => {
       birthdate,
       admin: false,
       type_user,
+      cnpj: sanitizedCnpj || null,
+      cpf: sanitizedCpf || null,
+      created_at: dateUTC,
     };
   } catch (error) {
     console.error(error);
@@ -163,8 +202,6 @@ const deleteUser = async (user_id) => {
     throw error;
   }
 };
-
-// Atualizar dados do usuário
 const updateUser = async (user) => {
   const {
     user_id,
@@ -177,6 +214,15 @@ const updateUser = async (user) => {
     birthdate,
     type_user,
   } = user;
+
+  const sanitizedCpf = sanitizeDocument(cpf);
+  const sanitizedCnpj = sanitizeDocument(cnpj);
+
+  let hashedPassword = password;
+  if (password) {
+    const salt = await bcrypt.genSalt(10);
+    hashedPassword = await bcrypt.hash(password, salt);
+  }
 
   const params = {
     TableName: USERS_TABLE,
@@ -194,9 +240,9 @@ const updateUser = async (user) => {
       ":username": username,
       ":email": email,
       ":image": image,
-      ":password": password,
-      ":cnpj": cnpj,
-      ":cpf": cpf,
+      ":password": hashedPassword,
+      ":cnpj": sanitizedCnpj,
+      ":cpf": sanitizedCpf,
       ":birthdate": birthdate,
       ":type_user": type_user,
     },
@@ -211,8 +257,6 @@ const updateUser = async (user) => {
     throw error;
   }
 };
-
-// Incrementa campanhas criadas
 const updateUserCampanhaCreated = async (user_id) => {
   const params = {
     TableName: USERS_TABLE,
@@ -233,8 +277,6 @@ const updateUserCampanhaCreated = async (user_id) => {
     throw error;
   }
 };
-
-// Incrementa total doado
 const updateTotalDonated = async (body) => {
   const { user_id, donated_value } = body;
 
@@ -256,8 +298,6 @@ const updateTotalDonated = async (body) => {
     throw error;
   }
 };
-
-// Incrementa campanhas que o usuário doou
 const updateTotalCampanhasDonated = async (body) => {
   const { user_id } = body;
 
@@ -280,8 +320,6 @@ const updateTotalCampanhasDonated = async (body) => {
     throw error;
   }
 };
-
-// Pega detalhes de campanhas por ID do usuário
 const getDetailsCampanhasByUsuarioId = async (user_id) => {
   const params = {
     TableName: USERS_TABLE,

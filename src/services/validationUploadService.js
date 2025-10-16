@@ -85,13 +85,13 @@ const uploadValidationDocuments = async (user_id, documents) => {
 
       await s3Client.send(uploadCommand);
 
-      // Retorna URL pública
-      const publicUrl = `${process.env.CLOUDFLARE_R2_ENDPOINT}/${BUCKET_NAME}/${key}`;
+      const publicUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`;
 
       return {
         name: doc.name,
         url: publicUrl,
         key: key,
+        type: doc.type || "application/octet-stream",
       };
     });
 

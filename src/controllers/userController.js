@@ -3,7 +3,7 @@ const userModel = require("../models/userModel");
 const findByEmail = async (req, res) => {
   try {
     const result = await userModel.findByEmail(req.params);
-    if (result.Items.length === 0) {
+    if (!result) {
       return res.status(404).json({ error: "Usuário não encontrado" });
     }
 
@@ -40,11 +40,11 @@ const findByCnpj = async (req, res) => {
   const { cnpj } = req.params;
   try {
     const result = await userModel.findByCnpj(cnpj);
-    if (result.Items.length === 0) {
+    if (!result) {
       return res.status(404).json({ error: "Usuário não encontrado" });
     }
 
-    const { password, ...safeUser } = result.Items[0];
+    const { password, ...safeUser } = result;
     res.status(200).json(safeUser);
   } catch (error) {
     console.error(error);
@@ -56,11 +56,11 @@ const findByCpf = async (req, res) => {
   const { cpf } = req.params;
   try {
     const result = await userModel.findByCpf(cpf);
-    if (result.Items.length === 0) {
+    if (!result) {
       return res.status(404).json({ error: "Usuário não encontrado" });
     }
 
-    const { password, ...safeUser } = result.Items[0];
+    const { password, ...safeUser } = result;
     res.status(200).json(safeUser);
   } catch (error) {
     console.error(error);
@@ -90,19 +90,11 @@ const signIn = async (req, res) => {
     const result = await userModel.signIn(req.body);
 
     if (!result) {
-      return res.status(401).json({ error: "Email ou senha inválidos" });
+      return res.status(401).json({ error: "E-mail ou senha inválidos" });
     }
 
-    const {
-      user_id,
-      email,
-      image = null,
-      cnpj = null,
-      cpf = null,
-      type_user,
-      admin,
-      username,
-    } = result;
+    const { user_id, email, image, cnpj, cpf, type_user, admin, username } =
+      result;
 
     const safeUser = {
       user_id,
@@ -124,7 +116,7 @@ const signIn = async (req, res) => {
 
 // Save or Update User
 const saveUser = async (req, res) => {
-  const { user_id } = req.body;
+  const { user_id, type_user, cpf, cnpj, email } = req.body;
 
   if (user_id) {
     try {
@@ -147,22 +139,30 @@ const saveUser = async (req, res) => {
     }
   } else {
     try {
-      const userExists = await userModel.findByEmail(req.body.email);
-      if (userExists.Items.length > 0) {
-        return res.status(400).json({ error: "Email já está em uso" });
+      const userExists = await userModel.findByEmail(email);
+      if (userExists) {
+        return res.status(400).json({ error: "E-mail já está em uso" });
       }
 
-      const user_type = req.body.user_type;
-
       // Verifica se o usuário é do tipo EMPRESA
-      if (user_type === 1) {
-        const userCnpjExists = await userModel.findByCnpj(req.body.cnpj);
-        if (userCnpjExists.Items.length > 0) {
+      if (type_user === 1) {
+        if (!cnpj || cnpj.trim() === "") {
+          return res.status(400).json({
+            error: "CNPJ é obrigatório para usuários do tipo EMPRESA",
+          });
+        }
+        const userCnpjExists = await userModel.findByCnpj(cnpj);
+        if (userCnpjExists) {
           return res.status(400).json({ error: "CNPJ já está em uso" });
         }
-      } else {
-        const userCpfExists = await userModel.findByCpf(req.body.cpf);
-        if (userCpfExists.Items.length > 0) {
+      } else if (type_user === 2) {
+        if (!cpf || cpf.trim() === "") {
+          return res.status(400).json({
+            error: "CPF é obrigatório para usuários do tipo PESSOA FÍSICA",
+          });
+        }
+        const userCpfExists = await userModel.findByCpf(cpf);
+        if (userCpfExists) {
           return res.status(400).json({ error: "CPF já está em uso" });
         }
       }
@@ -203,7 +203,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// Get Details Campanhas By UsuarioId
 const getDetailsCampanhasByUsuarioId = async (req, res) => {
   const { user_id } = req.params;
 

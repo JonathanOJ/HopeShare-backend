@@ -36,6 +36,12 @@ provider:
             - Fn::GetAtt: [ReportsTable, Arn]
             - Fn::GetAtt: [ConfigReceiptTable, Arn]
             - Fn::GetAtt: [BankTable, Arn]
+            # Permissões para GSI indexes da UsersTable
+            - Fn::Join:
+                - "/"
+                - - Fn::GetAtt: [UsersTable, Arn]
+                  - "index"
+                  - "*"
   environment:
     USERS_TABLE: ${self:custom.usersTableName}
     CAMPANHA_TABLE: ${self:custom.campanhaTableName}
@@ -51,6 +57,7 @@ provider:
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${param:CLOUDFLARE_R2_SECRET_ACCESS_KEY}
     CLOUDFLARE_R2_BUCKET_NAME: ${param:CLOUDFLARE_R2_BUCKET_NAME}
     CLOUDFLARE_R2_ENDPOINT: ${param:CLOUDFLARE_R2_ENDPOINT}
+    CLOUDFLARE_R2_PUBLIC_URL: ${param:CLOUDFLARE_R2_PUBLIC_URL}
     # Mercado Pago
     MERCADO_PAGO_ACCESS_TOKEN: ${param:MERCADO_PAGO_ACCESS_TOKEN}
     MERCADO_PAGO_PUBLIC_KEY: ${param:MERCADO_PAGO_PUBLIC_KEY}
@@ -72,9 +79,34 @@ resources:
         AttributeDefinitions:
           - AttributeName: user_id
             AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+          - AttributeName: cpf
+            AttributeType: S
+          - AttributeName: cnpj
+            AttributeType: S
         KeySchema:
           - AttributeName: user_id
             KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: email-index
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: cpf-index
+            KeySchema:
+              - AttributeName: cpf
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: cnpj-index
+            KeySchema:
+              - AttributeName: cnpj
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.usersTableName}
 

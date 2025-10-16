@@ -15,28 +15,38 @@ const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
 const VALIDATION_USER_TABLE = process.env.VALIDATION_USER_TABLE;
 
 const getValidationUser = async (user_id) => {
+  if (!user_id || user_id.trim() === "") {
+    console.error("Usuário é obrigatório");
+    return null;
+  }
+
   const params = {
     TableName: VALIDATION_USER_TABLE,
-    Key: { user_id },
+    FilterExpression: "#user.user_id = :user_id",
+    ExpressionAttributeNames: {
+      "#user": "user",
+    },
+    ExpressionAttributeValues: {
+      ":user_id": user_id,
+    },
   };
 
   try {
-    const result = await dynamoDbClient.send(new GetCommand(params));
-    return result.Item;
+    const result = await dynamoDbClient.send(new ScanCommand(params));
+    return result.Items?.[0] || null;
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao buscar validação do usuário:", error);
     return null;
   }
 };
 
 const createValidationUser = async (validationData) => {
-  const { user_id, cnpj, company_name, observation, documents } =
-    validationData;
+  const { user, cnpj, company_name, observation, documents } = validationData;
 
   try {
     const uploadedDocuments =
       await validationUploadService.replaceUserValidationDocuments(
-        user_id,
+        user.user_id,
         documents
       );
 
@@ -44,7 +54,7 @@ const createValidationUser = async (validationData) => {
       TableName: VALIDATION_USER_TABLE,
       Item: {
         validation_id: Date.now().toString(),
-        user_id,
+        user,
         status: "PENDING",
         cnpj,
         company_name,
@@ -54,7 +64,7 @@ const createValidationUser = async (validationData) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
-      ConditionExpression: "attribute_not_exists(user_id)",
+      ConditionExpression: "attribute_not_exists(validation_id)",
     };
 
     await dynamoDbClient.send(new PutCommand(params));
@@ -64,10 +74,11 @@ const createValidationUser = async (validationData) => {
       success: true,
     };
   } catch (error) {
-    // Se falhou no DynamoDB mas fez upload, tenta limpar
     if (error.message !== "Falha no upload") {
       try {
-        await validationUploadService.deleteAllUserValidationDocuments(user_id);
+        await validationUploadService.deleteAllUserValidationDocuments(
+          user.user_id
+        );
       } catch (cleanupError) {
         console.error("Erro ao limpar documentos após falha:", cleanupError);
       }
@@ -83,6 +94,11 @@ const updateValidationUser = async (user_id, updateData) => {
   const { company_name, documents } = updateData;
 
   try {
+    const existingValidation = await getValidationUser(user_id);
+    if (!existingValidation) {
+      throw new Error("Validação não encontrada para este usuário");
+    }
+
     let uploadedDocuments = [];
     if (documents && documents.length > 0) {
       uploadedDocuments =
@@ -94,14 +110,15 @@ const updateValidationUser = async (user_id, updateData) => {
 
     const params = {
       TableName: VALIDATION_USER_TABLE,
-      Key: { user_id },
+      Key: { validation_id: existingValidation.validation_id },
       UpdateExpression:
-        "SET #status = :status, company_name = :company_name, observation = :observation, documents = :documents, updated_at = :updated_at",
+        "SET #status = :status, observation_read = :observation_read, company_name = :company_name, observation = :observation, documents = :documents, updated_at = :updated_at",
       ExpressionAttributeNames: {
         "#status": "status",
       },
       ExpressionAttributeValues: {
         ":status": "PENDING",
+        ":observation_read": true,
         ":company_name": company_name,
         ":observation": "",
         ":documents":
@@ -128,7 +145,10 @@ const updateValidationAdmin = async (validation_id, updateData) => {
     TableName: VALIDATION_USER_TABLE,
     Key: { validation_id },
     UpdateExpression:
-      "SET status = :status, observation = :observation, observation_read = :observation_read, updated_at = :updated_at",
+      "SET #status = :status, observation = :observation, observation_read = :observation_read, updated_at = :updated_at",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
     ExpressionAttributeValues: {
       ":status": status,
       ":observation": observation,
@@ -147,9 +167,55 @@ const updateValidationAdmin = async (validation_id, updateData) => {
   }
 };
 
+const getPendingValidations = async () => {
+  const params = {
+    TableName: VALIDATION_USER_TABLE,
+    FilterExpression: "#status = :status",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
+    ExpressionAttributeValues: {
+      ":status": "PENDING",
+    },
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new ScanCommand(params));
+    // O objeto user já está incluso em cada validação
+    return result.Items || [];
+  } catch (error) {
+    console.error("Erro ao buscar validações pendentes:", error);
+    throw new Error("Não foi possível buscar validações pendentes");
+  }
+};
+
+const getValidationById = async (validation_id) => {
+  if (!validation_id || validation_id.trim() === "") {
+    console.error("validation_id é obrigatório");
+    return null;
+  }
+
+  const params = {
+    TableName: VALIDATION_USER_TABLE,
+    Key: {
+      validation_id: validation_id,
+    },
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new GetCommand(params));
+    return result.Item || null;
+  } catch (error) {
+    console.error("Erro ao buscar validação por ID:", error);
+    return null;
+  }
+};
+
 module.exports = {
   getValidationUser,
+  getValidationById,
   createValidationUser,
   updateValidationUser,
   updateValidationAdmin,
+  getPendingValidations,
 };

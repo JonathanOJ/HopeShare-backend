@@ -20,7 +20,7 @@ const saveConfigReceipt = async (configData) => {
   const params = {
     TableName: CONFIG_RECEIPT_TABLE,
     Item: {
-      receipt_id: new Date().now().toString(),
+      receipt_id: Date.now().toString(),
       user_id,
       bank,
       agency,
@@ -29,7 +29,6 @@ const saveConfigReceipt = async (configData) => {
       cnpj,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      status: "PENDING",
     },
     ConditionExpression: "attribute_not_exists(user_id)",
   };
@@ -69,7 +68,6 @@ const updateConfigReceipt = async (config_id, updateData) => {
   }
 };
 
-// Get Config Receipt by User ID
 const getConfigReceiptByUserId = async (user_id) => {
   const params = {
     TableName: CONFIG_RECEIPT_TABLE,
@@ -90,33 +88,8 @@ const getConfigReceiptByUserId = async (user_id) => {
   }
 };
 
-// Update Status of Config Receipt
-const updateStatusConfigReceipt = async (config_id, status) => {
-  const params = {
-    TableName: CONFIG_RECEIPT_TABLE,
-    Key: { config_id },
-    UpdateExpression: "SET #status = :status",
-    ExpressionAttributeNames: {
-      "#status": "status",
-    },
-    ExpressionAttributeValues: {
-      ":status": status,
-    },
-    ReturnValues: "ALL_NEW",
-  };
-
-  try {
-    const result = await dynamoDbClient.send(new UpdateCommand(params));
-    return result.Attributes;
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
-};
-
 module.exports = {
   saveConfigReceipt,
   updateConfigReceipt,
   getConfigReceiptByUserId,
-  updateStatusConfigReceipt,
 };

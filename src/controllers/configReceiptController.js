@@ -1,7 +1,7 @@
 const configReceiptModel = require("../models/configReceiptModel");
 const userModel = require("../models/userModel");
+const validationUserModel = require("../models/validationUserModel");
 
-// Create Config Receipt
 const saveConfigReceipt = async (req, res) => {
   try {
     const { user_id } = req.body;
@@ -11,7 +11,7 @@ const saveConfigReceipt = async (req, res) => {
 
     const user = await userModel.findById(user_id);
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "Usuário não encontrado" });
     }
 
     let result;
@@ -24,38 +24,40 @@ const saveConfigReceipt = async (req, res) => {
     } else {
       result = await configReceiptModel.saveConfigReceipt(
         req.body,
-        user.cnpj_verified
+        user.cnpj_verified || false
       );
     }
     res.status(200).json(result.Attributes);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not save config receipt" });
+    res
+      .status(500)
+      .json({ error: "Não foi possível salvar configuração de recebimento" });
   }
 };
 
-// Get Config Receipt by User ID
 const getConfigReceiptByUserId = async (req, res) => {
   const { user_id } = req.params;
 
   try {
     const result = await configReceiptModel.getConfigReceiptByUserId(user_id);
 
-    const user = await userModel.findById(user_id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    if (!result) {
+      return res.status(200).json(null);
     }
 
-    result.cnpj_verified = user.cnpj_verified;
+    const userValidation = await validationUserModel.getValidationUser(user_id);
 
-    if (result) {
-      res.status(200).json(result);
-    } else {
-      res.status(404).json({ error: "Config receipt not found for this user" });
-    }
+    result.cnpj_verified = userValidation
+      ? userValidation.status === "APPROVED" || false
+      : false;
+
+    res.status(200).json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not fetch config receipt by user" });
+    res.status(500).json({
+      error: "Não foi possível buscar configuração de recebimento do usuário",
+    });
   }
 };
 
