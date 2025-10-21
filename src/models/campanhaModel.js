@@ -7,6 +7,7 @@ const {
   UpdateCommand,
   DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
+const uploadService = require("../services/uploadService");
 
 const ddbClient = new DynamoDBClient({ region: "us-east-1" });
 const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
@@ -18,7 +19,7 @@ const findById = async (campanha_id) => {
     TableName: CAMPANHA_TABLE,
     Key: { campanha_id },
     ProjectionExpression:
-      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address_street, address_number, address_complement, address_city, address_state, address_zipcode, address_neighborhood, have_address",
+      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
     ExpressionAttributeNames: {
       "#status": "status",
     },
@@ -41,7 +42,7 @@ const findAllByUser = async (user_id) => {
       ":user_id": user_id,
     },
     ProjectionExpression:
-      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address_street, address_number, address_complement, address_city, address_state, address_zipcode, address_neighborhood, have_address",
+      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
     ExpressionAttributeNames: {
       "#status": "status",
     },
@@ -64,7 +65,7 @@ const searchCampanhas = async (searchBody) => {
     TableName: CAMPANHA_TABLE,
     Limit: itemsPerPage,
     ProjectionExpression:
-      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address_street, address_number, address_complement, address_city, address_state, address_zipcode, address_neighborhood, have_address",
+      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
     ExpressionAttributeNames: {
       "#status": "status",
     },
@@ -90,6 +91,18 @@ const searchCampanhas = async (searchBody) => {
 
   try {
     const result = await dynamoDbClient.send(new ScanCommand(params));
+
+    if (result.Items) {
+      result.Items = result.Items.map((campanha) => {
+        if (campanha.user_responsable) {
+          const { email, cpf, cnpj, password, ...safeUserData } =
+            campanha.user_responsable;
+          campanha.user_responsable = safeUserData;
+        }
+        return campanha;
+      });
+    }
+
     return result;
   } catch (error) {
     console.error(error);
@@ -104,21 +117,28 @@ const createCampanha = async (campanha) => {
   const {
     title,
     description,
-    image,
+    new_file_image,
     category,
     request_emergency,
     value_required,
     user_responsable,
     status,
-    address_street,
-    address_number,
-    address_complement,
-    address_city,
-    address_state,
-    address_zipcode,
-    address_neighborhood,
+    address,
     have_address,
   } = campanha;
+
+  let finalImage = null;
+
+  if (new_file_image) {
+    const uploadResult = await uploadService.uploadCampanhaImage(
+      newId,
+      new_file_image
+    );
+    finalImage = {
+      url: uploadResult.url,
+      key: uploadResult.key,
+    };
+  }
 
   const params = {
     TableName: CAMPANHA_TABLE,
@@ -126,7 +146,7 @@ const createCampanha = async (campanha) => {
       campanha_id: newId,
       title,
       description,
-      image,
+      image: finalImage ? finalImage : null,
       category,
       request_emergency,
       value_required,
@@ -135,13 +155,7 @@ const createCampanha = async (campanha) => {
       user_responsable,
       created_at: dateUTC,
       status,
-      address_street: address_street || null,
-      address_number: address_number || null,
-      address_complement: address_complement || null,
-      address_city: address_city || null,
-      address_state: address_state || null,
-      address_zipcode: address_zipcode || null,
-      address_neighborhood: address_neighborhood || null,
+      address,
       have_address: have_address,
     },
   };
@@ -156,13 +170,37 @@ const createCampanha = async (campanha) => {
 };
 
 const updateCampanha = async (campanha) => {
-  const { campanha_id, ...updateFields } = campanha;
+  const { campanha_id, new_file_image, ...updateFields } = campanha;
+
+  if (new_file_image) {
+    if (updateFields.image && updateFields.image.key) {
+      await uploadService.deleteCampanhaImage(updateFields.image.key);
+    }
+
+    const uploadResult = await uploadService.uploadCampanhaImage(
+      campanha_id,
+      new_file_image
+    );
+
+    const newImage = {
+      url: uploadResult.url,
+      key: uploadResult.key,
+    };
+
+    updateFields.image = newImage;
+  }
 
   const updateExpression = [];
   const expressionAttributeValues = {};
+  const expressionAttributeNames = {};
 
   for (const key in updateFields) {
-    updateExpression.push(`${key} = :${key}`);
+    if (key === "status") {
+      updateExpression.push(`#status = :${key}`);
+      expressionAttributeNames["#status"] = "status";
+    } else {
+      updateExpression.push(`${key} = :${key}`);
+    }
     expressionAttributeValues[`:${key}`] = updateFields[key];
   }
 
@@ -173,6 +211,10 @@ const updateCampanha = async (campanha) => {
     ExpressionAttributeValues: expressionAttributeValues,
     ReturnValues: "ALL_NEW",
   };
+
+  if (Object.keys(expressionAttributeNames).length > 0) {
+    params.ExpressionAttributeNames = expressionAttributeNames;
+  }
 
   try {
     const result = await dynamoDbClient.send(new UpdateCommand(params));

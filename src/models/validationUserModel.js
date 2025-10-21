@@ -7,7 +7,7 @@ const {
   UpdateCommand,
   DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
-const validationUploadService = require("../services/validationUploadService");
+const uploadService = require("../services/uploadService");
 
 const ddbClient = new DynamoDBClient({ region: "us-east-1" });
 const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
@@ -45,7 +45,7 @@ const createValidationUser = async (validationData) => {
 
   try {
     const uploadedDocuments =
-      await validationUploadService.replaceUserValidationDocuments(
+      await uploadService.replaceUserValidationDocuments(
         user.user_id,
         documents
       );
@@ -76,9 +76,7 @@ const createValidationUser = async (validationData) => {
   } catch (error) {
     if (error.message !== "Falha no upload") {
       try {
-        await validationUploadService.deleteAllUserValidationDocuments(
-          user.user_id
-        );
+        await uploadService.deleteAllUserValidationDocuments(user.user_id);
       } catch (cleanupError) {
         console.error("Erro ao limpar documentos após falha:", cleanupError);
       }
@@ -101,11 +99,10 @@ const updateValidationUser = async (user_id, updateData) => {
 
     let uploadedDocuments = [];
     if (documents && documents.length > 0) {
-      uploadedDocuments =
-        await validationUploadService.replaceUserValidationDocuments(
-          user_id,
-          documents
-        );
+      uploadedDocuments = await uploadService.replaceUserValidationDocuments(
+        user_id,
+        documents
+      );
     }
 
     const params = {

@@ -7,15 +7,14 @@ const findById = async (req, res) => {
     if (result) {
       return res.status(200).json(result);
     } else {
-      return res.status(404).json({ error: "Campanha not found" });
+      return res.status(404).json({ error: "Campanha não encontrada" });
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not fetch campanha" });
+    res.status(500).json({ error: "Não foi possível buscar campanha" });
   }
 };
 
-// Find All Campanhas by User ID
 const findAllByUser = async (req, res) => {
   const { user_id } = req.params;
 
@@ -24,18 +23,19 @@ const findAllByUser = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not fetch campanhas by user" });
+    res
+      .status(500)
+      .json({ error: "Não foi possível buscar campanhas do usuário" });
   }
 };
 
-// Search Campanhas
 const searchCampanhas = async (req, res) => {
   try {
     const result = await campanhaModel.searchCampanhas(req.body);
     res.status(200).json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not perform search" });
+    res.status(500).json({ error: "Não foi possível realizar a busca" });
   }
 };
 
@@ -43,6 +43,31 @@ const searchCampanhas = async (req, res) => {
 const saveCampanha = async (req, res) => {
   try {
     let result;
+
+    try {
+      const imageFile = req.files?.find(
+        (f) => f.fieldname === "new_file_image"
+      );
+
+      req.body.image = req.body.image ? JSON.parse(req.body.image) : null;
+      req.body.user_responsable = JSON.parse(req.body.user_responsable);
+      req.body.category = JSON.parse(req.body.category);
+      req.body.value_required = Number(req.body.value_required);
+      req.body.address = req.body.address ? JSON.parse(req.body.address) : null;
+      req.body.have_address = req.body.have_address === "true";
+      req.body.request_emergency = req.body.request_emergency === "true";
+
+      if (imageFile) {
+        req.body.new_file_image = imageFile;
+      }
+    } catch (e) {
+      console.error(
+        "Erro ao fazer parse da imagem, usuário responsável, categoria ou endereço:",
+        e
+      );
+      throw new Error("Erro ao processar os dados enviados");
+    }
+
     if (req.body.campanha_id != "") {
       result = await campanhaModel.updateCampanha(req.body);
     } else {
@@ -59,17 +84,18 @@ const saveCampanha = async (req, res) => {
     console.error(error);
     res
       .status(500)
-      .json({ error: "An error occurred while processing the request" });
+      .json({ error: "Ocorreu um erro ao processar a solicitação" });
   }
 };
 
-// Delete Campanha
 const deleteCampanha = async (req, res) => {
   const { campanha_id } = req.params;
   const campanha = await campanhaModel.findById(campanha_id);
 
   if (campanha.value_donated > 0) {
-    return res.status(400).json({ error: "Campanha have donations!" });
+    return res.status(400).json({
+      error: "Não é possível deletar a campanha, pois possui doações!",
+    });
   }
 
   try {
@@ -77,11 +103,10 @@ const deleteCampanha = async (req, res) => {
     res.status(200).json({ success: result.Attributes ? true : false });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not delete campanha" });
+    res.status(500).json({ error: "Não foi possível deletar a campanha" });
   }
 };
 
-// Donate
 const donate = async (req, res) => {
   try {
     const result = await campanhaModel.donate(req.body);
@@ -101,31 +126,30 @@ const donate = async (req, res) => {
     res.status(200).json(result.Attributes);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not donate" });
+    res.status(500).json({ error: "Não foi possível realizar a doação" });
   }
 };
 
-// Add, Get, Delete Comments
 const addComment = async (req, res) => {
   const { campanha_id } = req.params;
 
   const { user_id, comment } = req.body;
 
   if (!user_id || !comment) {
-    return res.status(400).json({ error: "Missing user_id or comment" });
+    return res.status(400).json({ error: "Faltando usuário ou comentário" });
   }
 
   try {
     const user = await userModel.findById(user_id);
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "Usuário não encontrado" });
     }
 
     const result = await campanhaModel.addComment(campanha_id, user, comment);
     res.status(200).json(result.Attributes);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not add comment" });
+    res.status(500).json({ error: "Não foi possível adicionar o comentário" });
   }
 };
 
@@ -137,7 +161,9 @@ const getComments = async (req, res) => {
     res.status(200).json(result.Attributes);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not retrieve comments" });
+    res
+      .status(500)
+      .json({ error: "Não foi possível recuperar os comentários" });
   }
 };
 
@@ -149,17 +175,17 @@ const deleteComment = async (req, res) => {
     res.status(200).json({ success: result.Attributes ? true : false });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not delete comment" });
+    res.status(500).json({ error: "Não foi possível deletar o comentário" });
   }
 };
 
-// Admin
+// ################## Admin ###################
 const updateStatusCampanha = async (req, res) => {
   const { campanha_id, user_id, status } = req.params;
 
   const adminUser = await userModel.findById(user_id);
   if (!adminUser || !adminUser.isAdmin) {
-    return res.status(403).json({ error: "Access denied" });
+    return res.status(403).json({ error: "Acesso negado" });
   }
 
   try {
@@ -170,7 +196,9 @@ const updateStatusCampanha = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not change campanha status" });
+    res
+      .status(500)
+      .json({ error: "Não foi possível alterar o status da campanha" });
   }
 };
 

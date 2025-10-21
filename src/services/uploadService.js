@@ -118,8 +118,86 @@ const replaceUserValidationDocuments = async (user_id, documents) => {
   }
 };
 
+// Funções para upload de imagens de campanhas
+const deleteImageCampanha = async (imageKey) => {
+  try {
+    if (!imageKey) {
+      console.log("Nenhuma chave de imagem fornecida para deletar");
+      return false;
+    }
+
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: imageKey,
+    });
+
+    await s3Client.send(deleteCommand);
+    return true;
+  } catch (error) {
+    console.error(`Erro ao deletar imagem: ${error.message}`);
+    throw new Error(`Falha ao deletar imagem: ${error.message}`);
+  }
+};
+
+const uploadCampanhaImage = async (campanha_id, imageFile) => {
+  try {
+    if (!imageFile) {
+      throw new Error("Nenhum arquivo de imagem fornecido");
+    }
+
+    const timestamp = Date.now();
+    const sanitizedName = imageFile.originalname.replace(
+      /[^a-zA-Z0-9.-]/g,
+      "_"
+    );
+    const key = `campanhas/${campanha_id}/${timestamp}-${sanitizedName}`;
+
+    const uploadCommand = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: imageFile.buffer,
+      ContentType: imageFile.mimetype,
+      Metadata: {
+        originalName: imageFile.originalname,
+        campanhaId: campanha_id,
+      },
+    });
+
+    await s3Client.send(uploadCommand);
+
+    const publicUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`;
+
+    return {
+      url: publicUrl,
+      key: key,
+    };
+  } catch (error) {
+    throw new Error(`Falha no upload da imagem: ${error.message}`);
+  }
+};
+
+const replaceCampanhaImage = async (campanha_id, oldImageKey, newImageFile) => {
+  try {
+    // Deleta a imagem antiga se existir
+    if (oldImageKey) {
+      await deleteImageCampanha(oldImageKey);
+    }
+
+    // Faz upload da nova imagem
+    const uploadResult = await uploadCampanhaImage(campanha_id, newImageFile);
+
+    return uploadResult;
+  } catch (error) {
+    throw new Error(`Falha ao substituir imagem: ${error.message}`);
+  }
+};
+
 module.exports = {
   deleteAllUserValidationDocuments,
   uploadValidationDocuments,
   replaceUserValidationDocuments,
+
+  deleteImageCampanha,
+  uploadCampanhaImage,
+  replaceCampanhaImage,
 };

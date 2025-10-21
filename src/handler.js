@@ -19,6 +19,8 @@ app.post(
   validationUserController.saveValidationUser
 );
 
+app.post("/campanha/save", upload.any(), campanhaController.saveCampanha);
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -54,7 +56,6 @@ app.get(
 app.get("/campanha/:campanha_id", campanhaController.findById);
 app.get("/campanha/findAllByUser/:user_id", campanhaController.findAllByUser);
 app.post("/campanha/search", campanhaController.searchCampanhas);
-app.post("/campanha/save", campanhaController.saveCampanha);
 app.delete("/campanha/:campanha_id", campanhaController.deleteCampanha);
 app.post("/campanha/:campanha_id/comments", campanhaController.addComment);
 app.get("/campanha/:campanha_id/comments", campanhaController.getComments);
