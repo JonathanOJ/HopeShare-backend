@@ -17,9 +17,11 @@ const findById = async (req, res) => {
 
 const findAllByUser = async (req, res) => {
   const { user_id } = req.params;
+  const { with_comments } = req.query;
 
   try {
-    const result = await campanhaModel.findAllByUser(user_id);
+    const withComments = with_comments === "true";
+    const result = await campanhaModel.findAllByUser(user_id, withComments);
     res.status(200).json(result);
   } catch (error) {
     console.error(error);
@@ -41,6 +43,15 @@ const searchCampanhas = async (req, res) => {
 
 // Create or Update Campanha
 const saveCampanha = async (req, res) => {
+  const { campanha_id, status } = req.body;
+
+  if (campanha_id && status !== "ACTIVE") {
+    res.status(400).json({
+      error: "Campanha só pode ser atualizada se estiver com status ATIVA",
+    });
+    return;
+  }
+
   try {
     let result;
 
@@ -55,7 +66,7 @@ const saveCampanha = async (req, res) => {
       req.body.value_required = Number(req.body.value_required);
       req.body.address = req.body.address ? JSON.parse(req.body.address) : null;
       req.body.have_address = req.body.have_address === "true";
-      req.body.request_emergency = req.body.request_emergency === "true";
+      req.body.emergency = req.body.emergency === "true";
 
       if (imageFile) {
         req.body.new_file_image = imageFile;
@@ -146,7 +157,7 @@ const addComment = async (req, res) => {
     }
 
     const result = await campanhaModel.addComment(campanha_id, user, comment);
-    res.status(200).json(result.Attributes);
+    res.status(200).json(result.Attributes || result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Não foi possível adicionar o comentário" });
@@ -158,7 +169,7 @@ const getComments = async (req, res) => {
 
   try {
     const result = await campanhaModel.getComments(campanha_id);
-    res.status(200).json(result.Attributes);
+    res.status(200).json(result);
   } catch (error) {
     console.error(error);
     res
@@ -172,7 +183,7 @@ const deleteComment = async (req, res) => {
 
   try {
     const result = await campanhaModel.deleteComment(campanha_id, comment_id);
-    res.status(200).json({ success: result.Attributes ? true : false });
+    res.status(200).json({ success: result ? true : false });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Não foi possível deletar o comentário" });
@@ -184,8 +195,8 @@ const updateStatusCampanha = async (req, res) => {
   const { campanha_id, user_id, status } = req.params;
 
   const adminUser = await userModel.findById(user_id);
-  if (!adminUser || !adminUser.isAdmin) {
-    return res.status(403).json({ error: "Acesso negado" });
+  if (!adminUser || !adminUser.admin) {
+    return res.status(401).json({ error: "Acesso negado" });
   }
 
   try {
@@ -202,6 +213,45 @@ const updateStatusCampanha = async (req, res) => {
   }
 };
 
+const suspendCampanha = async (req, res) => {
+  const { campanha_id, user_id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason) {
+    return res.status(400).json({ error: "Motivo da suspensão é obrigatório" });
+  }
+
+  const adminUser = await userModel.findById(user_id);
+  if (!adminUser || !adminUser.admin) {
+    return res.status(401).json({ error: "Acesso negado" });
+  }
+
+  try {
+    const result = await campanhaModel.suspendCampanha(campanha_id, reason);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Não foi possível suspender a campanha" });
+  }
+};
+
+const reactivateCampanha = async (req, res) => {
+  const { campanha_id, user_id } = req.params;
+
+  const adminUser = await userModel.findById(user_id);
+  if (!adminUser || !adminUser.admin) {
+    return res.status(401).json({ error: "Acesso negado" });
+  }
+
+  try {
+    const result = await campanhaModel.reactivateCampanha(campanha_id);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Não foi possível reativar a campanha" });
+  }
+};
+
 module.exports = {
   searchCampanhas,
   findById,
@@ -213,4 +263,6 @@ module.exports = {
   getComments,
   deleteComment,
   updateStatusCampanha,
+  suspendCampanha,
+  reactivateCampanha,
 };

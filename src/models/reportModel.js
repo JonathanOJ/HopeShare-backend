@@ -13,26 +13,28 @@ const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
 
 const REPORTS_TABLE = process.env.REPORTS_TABLE;
 
-const reportCampanha = async (campanha_id, user, reason, description) => {
+const reportCampanha = async (campanha, user, reason, description) => {
   const dateUTC = new Date().toISOString();
   const newReportId = Date.now().toString();
 
+  const newReport = {
+    report_id: newReportId,
+    campanha,
+    user,
+    reason,
+    description,
+    status: "PENDING",
+    created_at: dateUTC,
+  };
+
   const params = {
     TableName: REPORTS_TABLE,
-    Item: {
-      report_id: newReportId,
-      campanha_id,
-      user,
-      reason,
-      description,
-      status: "PENDING",
-      created_at: dateUTC,
-    },
+    Item: newReport,
   };
 
   try {
-    const result = await dynamoDbClient.send(new PutCommand(params));
-    return result.Attributes;
+    await dynamoDbClient.send(new PutCommand(params));
+    return newReport;
   } catch (error) {
     console.error(error);
     return null;

@@ -94,7 +94,7 @@ const updateValidationAdmin = async (req, res) => {
     const adminUser = await userModel.findById(user_id);
     if (!adminUser || !adminUser.admin) {
       return res
-        .status(403)
+        .status(401)
         .json({ error: "Acesso negado. Apenas administradores." });
     }
 
@@ -132,7 +132,7 @@ const getPendingValidations = async (req, res) => {
     const adminUser = await userModel.findById(user_id);
     if (!adminUser || !adminUser.admin) {
       return res
-        .status(403)
+        .status(401)
         .json({ error: "Acesso negado. Apenas administradores." });
     }
 

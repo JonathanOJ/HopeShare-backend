@@ -24,7 +24,7 @@ app.post("/campanha/save", upload.any(), campanhaController.saveCampanha);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Validações de documentos do usuário
+// ################## Validações de documentos do usuário ###################
 app.get("/validation/:user_id", validationUserController.getValidationUser);
 app.patch(
   "/validation/admin/:user_id/update",
@@ -35,7 +35,7 @@ app.get(
   validationUserController.getPendingValidations
 );
 
-// Rotas de Users
+// ################## Rotas de Users ###################
 app.get("/users/findByEmail/:email", userController.findByEmail);
 app.get("/users/findByCnpj/:cnpj", userController.findByCnpj);
 app.get("/users/findByCpf/:cpf", userController.findByCpf);
@@ -52,7 +52,7 @@ app.get(
   userController.getDetailsCampanhasByUsuarioId
 );
 
-// Rotas de Campanha
+// ################## Rotas de campanha ###################
 app.get("/campanha/:campanha_id", campanhaController.findById);
 app.get("/campanha/findAllByUser/:user_id", campanhaController.findAllByUser);
 app.post("/campanha/search", campanhaController.searchCampanhas);
@@ -63,24 +63,34 @@ app.delete(
   "/campanha/:campanha_id/comments/:comment_id",
   campanhaController.deleteComment
 );
+app.post("/campanha/report", reportController.reportCampanha);
 
-// Rotas de campanha - Admin
+// ################## Rotas de campanha - Admin ###################
 app.patch(
   "/campanha/admin/:user_id/campanhas/:campanha_id/:status",
   campanhaController.updateStatusCampanha
 );
-
-// Rotas de reports
-app.post("/report", reportController.reportCampanha);
-
-// Rotas de reports - Admin
-app.get("/admin/:user_id/reports", reportController.getDenuncias);
 app.patch(
-  "/admin/:user_id/reports/status",
+  "/campanha/admin/:user_id/campanha/:campanha_id/suspend",
+  campanhaController.suspendCampanha
+);
+app.patch(
+  "/campanha/admin/:user_id/campanha/:campanha_id/reactivate",
+  campanhaController.reactivateCampanha
+);
+
+// ################## Rotas de reports - Admin ###################
+app.get("/campanha/admin/:user_id/reports", reportController.getDenuncias);
+app.get(
+  "/campanha/admin/:user_id/reports-grouped",
+  reportController.getDenunciasGrouped
+);
+app.patch(
+  "/campanha/admin/:user_id/reports/:report_id/status",
   reportController.updateDenunciaStatus
 );
 
-// Rotas de depositos
+// ################## Rotas de depositos ###################
 app.post(
   "/campanha/deposito/request",
   depositController.createSolicitacaoDeposito
@@ -90,18 +100,23 @@ app.get(
   depositController.getMySolicitacoesDeposito
 );
 app.patch(
-  "/campanha/depositos/status",
+  "/campanha/admin/depositos/status",
   depositController.updateSolicitacaoDepositoStatus
 );
 
-// Rotas de configuração de recebimento
+app.get(
+  "/campanha/admin/:user_id/deposito/pending",
+  depositController.getSolicitacoesDepositoPendingAdmin
+);
+
+// ################## Rotas de configuração de recebimento ###################
 app.post("/config/receipt", configReceiptController.saveConfigReceipt);
 app.get(
   "/config/receipt/:user_id",
   configReceiptController.getConfigReceiptByUserId
 );
 
-// Rotas de Doações - Mercado Pago
+// ################## Rotas de Doações - Mercado Pago ###################
 app.post("/donations/create", donationController.createDonation);
 app.get("/donations/:user_id/user", donationController.getUserDonations);
 app.get(
@@ -110,10 +125,10 @@ app.get(
 );
 app.post("/donations/:payment_id/refund", donationController.refundDonation);
 
-// Webhook Mercado Pago
+// ################## Webhook Mercado Pago ###################
 app.post("/webhooks/mercadopago", donationController.mercadoPagoWebhook);
 
-// Rotas do bancos
+// ##################  Rotas do bancos ###################
 app.post("/banks/search", bankController.searchBanks);
 app.get("/banks/:bank_id", bankController.getBankById);
 

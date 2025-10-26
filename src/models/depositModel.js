@@ -11,27 +11,27 @@ const {
 const ddbClient = new DynamoDBClient({ region: "us-east-1" });
 const dynamoDbClient = DynamoDBDocumentClient.from(ddbClient);
 
-const DEPOSIT_TABLE = process.env.DEPOSIT_TABLE;
+const DEPOSIT_TABLE = process.env.DEPOSIT_REQUEST_TABLE;
 
-const createSolicitacaoDeposito = async (user, campanha, request_message) => {
+const createSolicitacaoDeposito = async (user, campanha) => {
+  const newDeposit = {
+    request_id: Date.now().toString(),
+    user,
+    campanha,
+    status: "PENDING",
+    created_at: new Date().toISOString(),
+    updated_at: null,
+    justification_admin: null,
+  };
+
   const params = {
     TableName: DEPOSIT_TABLE,
-    Item: {
-      request_id: Date.now().toString(),
-      user,
-      campanha,
-      status: "PENDING",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      justification_admin: null,
-      request_message: request_message || null,
-    },
-    ReturnValues: "ALL_OLD",
+    Item: newDeposit,
   };
 
   try {
-    const result = await dynamoDbClient.send(new PutCommand(params));
-    return result;
+    await dynamoDbClient.send(new PutCommand(params));
+    return newDeposit;
   } catch (error) {
     console.error(error);
     return null;
@@ -41,7 +41,10 @@ const createSolicitacaoDeposito = async (user, campanha, request_message) => {
 const getMySolicitacoesDeposito = async (user_id) => {
   const params = {
     TableName: DEPOSIT_TABLE,
-    FilterExpression: "user.user_id = :user_id",
+    FilterExpression: "#user.user_id = :user_id",
+    ExpressionAttributeNames: {
+      "#user": "user",
+    },
     ExpressionAttributeValues: {
       ":user_id": user_id,
     },
@@ -58,7 +61,7 @@ const getMySolicitacoesDeposito = async (user_id) => {
 
 const updateSolicitacaoDepositoStatus = async (
   request_id,
-  newStatus,
+  new_status,
   justification_admin
 ) => {
   const params = {
@@ -70,7 +73,7 @@ const updateSolicitacaoDepositoStatus = async (
       "#status": "status",
     },
     ExpressionAttributeValues: {
-      ":status": newStatus,
+      ":status": new_status,
       ":justification_admin": justification_admin || null,
       ":updated_at": new Date().toISOString(),
     },
@@ -86,8 +89,30 @@ const updateSolicitacaoDepositoStatus = async (
   }
 };
 
+const getSolicitacoesDepositoPendingAdmin = async () => {
+  const params = {
+    TableName: DEPOSIT_TABLE,
+    FilterExpression: "#status = :status",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
+    ExpressionAttributeValues: {
+      ":status": "PENDING",
+    },
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new ScanCommand(params));
+    return result;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
 module.exports = {
   createSolicitacaoDeposito,
   getMySolicitacoesDeposito,
   updateSolicitacaoDepositoStatus,
+  getSolicitacoesDepositoPendingAdmin,
 };

@@ -19,7 +19,7 @@ const findById = async (campanha_id) => {
     TableName: CAMPANHA_TABLE,
     Key: { campanha_id },
     ProjectionExpression:
-      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
+      "campanha_id, title, description, image, category, emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
     ExpressionAttributeNames: {
       "#status": "status",
     },
@@ -34,15 +34,48 @@ const findById = async (campanha_id) => {
   }
 };
 
-const findAllByUser = async (user_id) => {
+const findAllByIds = async (campanha_ids) => {
+  const params = {
+    TableName: CAMPANHA_TABLE,
+    FilterExpression:
+      "campanha_id IN (" +
+      campanha_ids.map((_, i) => `:id${i}`).join(", ") +
+      ")",
+    ExpressionAttributeValues: campanha_ids.reduce((acc, id, i) => {
+      acc[`:id${i}`] = id;
+      return acc;
+    }, {}),
+    ProjectionExpression:
+      "campanha_id, title, description, image, category, emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new ScanCommand(params));
+    return result.Items;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
+const findAllByUser = async (user_id, with_comments = false) => {
+  let projectionExpression =
+    "campanha_id, title, description, image, category, emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address";
+
+  if (with_comments) {
+    projectionExpression += ", comments";
+  }
+
   const params = {
     TableName: CAMPANHA_TABLE,
     FilterExpression: "user_responsable.user_id = :user_id",
     ExpressionAttributeValues: {
       ":user_id": user_id,
     },
-    ProjectionExpression:
-      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
+    ProjectionExpression: projectionExpression,
     ExpressionAttributeNames: {
       "#status": "status",
     },
@@ -65,7 +98,7 @@ const searchCampanhas = async (searchBody) => {
     TableName: CAMPANHA_TABLE,
     Limit: itemsPerPage,
     ProjectionExpression:
-      "campanha_id, title, description, image, category, request_emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
+      "campanha_id, title, description, image, category, emergency, value_required, value_donated, users_donated, user_responsable, created_at, #status, address, have_address",
     ExpressionAttributeNames: {
       "#status": "status",
     },
@@ -119,7 +152,7 @@ const createCampanha = async (campanha) => {
     description,
     new_file_image,
     category,
-    request_emergency,
+    emergency,
     value_required,
     user_responsable,
     status,
@@ -148,7 +181,7 @@ const createCampanha = async (campanha) => {
       description,
       image: finalImage ? finalImage : null,
       category,
-      request_emergency,
+      emergency,
       value_required,
       value_donated: 0,
       users_donated: [],
@@ -244,9 +277,59 @@ const updateStatusCampanha = async (campanha_id, status) => {
   const params = {
     TableName: CAMPANHA_TABLE,
     Key: { campanha_id },
-    UpdateExpression: "SET status = :status",
+    UpdateExpression: "SET #status = :status",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
     ExpressionAttributeValues: {
       ":status": status,
+    },
+    ReturnValues: "ALL_NEW",
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new UpdateCommand(params));
+    return result.Attributes;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
+const suspendCampanha = async (campanha_id, reason) => {
+  const params = {
+    TableName: CAMPANHA_TABLE,
+    Key: { campanha_id },
+    UpdateExpression: "SET #status = :status, reason_suspension = :reason",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
+    ExpressionAttributeValues: {
+      ":status": "SUSPENDED",
+      ":reason": reason,
+    },
+    ReturnValues: "ALL_NEW",
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new UpdateCommand(params));
+    return result.Attributes;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
+const reactivateCampanha = async (campanha_id) => {
+  const params = {
+    TableName: CAMPANHA_TABLE,
+    Key: { campanha_id },
+    UpdateExpression: "SET #status = :status REMOVE reason_suspension",
+    ExpressionAttributeNames: {
+      "#status": "status",
+    },
+    ExpressionAttributeValues: {
+      ":status": "ACTIVE",
     },
     ReturnValues: "ALL_NEW",
   };
@@ -279,8 +362,8 @@ const addComment = async (campanha_id, user, content) => {
 
     const saveUser = {
       user_id: user.user_id,
-      name: user.name,
-      image: user.image || null,
+      username: user.username,
+      image: user.image?.url || null,
     };
 
     const comments = campanhaData.Item.comments || [];
@@ -303,8 +386,9 @@ const addComment = async (campanha_id, user, content) => {
       ReturnValues: "ALL_NEW",
     };
 
-    const result = await dynamoDbClient.send(new UpdateCommand(updateParams));
-    return result;
+    await dynamoDbClient.send(new UpdateCommand(updateParams));
+
+    return newComment;
   } catch (error) {
     console.error(error);
     throw error;
@@ -325,7 +409,7 @@ const getComments = async (campanha_id) => {
       throw new Error("Campanha não encontrada");
     }
 
-    return { comments: campanhaData.Item.comments || [] };
+    return campanhaData.Item.comments || [];
   } catch (error) {
     console.error(error);
     throw error;
@@ -386,4 +470,7 @@ module.exports = {
   getComments,
   deleteComment,
   updateStatusCampanha,
+  suspendCampanha,
+  reactivateCampanha,
+  findAllByIds,
 };
