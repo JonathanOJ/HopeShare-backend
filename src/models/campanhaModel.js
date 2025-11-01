@@ -91,7 +91,7 @@ const findAllByUser = async (user_id, with_comments = false) => {
 };
 
 const searchCampanhas = async (searchBody) => {
-  const { search, category, page, itemsPerPage } = searchBody;
+  const { search, category, page, itemsPerPage, user_id } = searchBody;
   const offset = itemsPerPage * (page - 1);
 
   const params = {
@@ -108,7 +108,7 @@ const searchCampanhas = async (searchBody) => {
   const expressionAttributeValues = {};
 
   if (search) {
-    filterExpressions.push("contains(title, :search)");
+    filterExpressions.push("contains(LOWER(title), LOWER(:search))");
     expressionAttributeValues[":search"] = search;
   }
 
@@ -121,6 +121,15 @@ const searchCampanhas = async (searchBody) => {
     params.FilterExpression = filterExpressions.join(" AND ");
     params.ExpressionAttributeValues = expressionAttributeValues;
   }
+
+  if (user_id) {
+    params.FilterExpression = "user_responsable.user_id = :user_id";
+    params.ExpressionAttributeValues = {
+      ":user_id": user_id,
+    };
+  }
+
+  params.ExclusiveStartKey = offset > 0 ? { campanha_id: offset } : undefined;
 
   try {
     const result = await dynamoDbClient.send(new ScanCommand(params));
