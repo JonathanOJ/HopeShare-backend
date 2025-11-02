@@ -4,12 +4,12 @@
 
 - **Total de Test Suites:** 9
 - **Total de Testes:** 200
-- **Tempo de Execução:** ~1.66s
+- **Tempo de Execução:** ~0.96s
 - **Taxa de Sucesso:** 100% ✅
 
 ## ✅ Testes Criados
 
-### 📁 depositController.test.js
+### depositController.test.js
 
 **Total: 25 testes cobrindo 4 funções**
 
@@ -55,7 +55,7 @@
 
 ---
 
-### 📁 configReceiptController.test.js
+### configReceiptController.test.js
 
 **Total: 17 testes cobrindo 2 funções**
 
@@ -90,7 +90,7 @@
 
 ---
 
-### 📁 campanhaController.test.js
+### campanhaController.test.js
 
 **Total: 32 testes cobrindo 12 funções**
 
@@ -158,7 +158,7 @@
 
 ---
 
-### 📁 bankController.test.js
+### bankController.test.js
 
 **Total: 15 testes cobrindo 2 funções**
 
@@ -192,9 +192,9 @@
 
 ## Estatísticas Gerais
 
-- **Total de Test Suites**: 8 (todos passando ✅)
-- **Total de Testes**: 179 (todos passando ✅)
-- **Tempo de Execução**: ~0.98s
+- **Total de Test Suites**: 9 (todos passando ✅)
+- **Total de Testes**: 200 (todos passando ✅)
+- **Tempo de Execução**: ~0.96s
 - **Cobertura**: Controladores principais do backend
 
 ## Test Suites Implementados
@@ -369,7 +369,28 @@
   - Detalhes de campanhas do usuário
   - Tratamento de erros (400, 401, 404, 500)
 
-## Padrões de Teste Utilizados
+### 9. validationUserController.test.js
+
+- **Total de Testes**: 21
+- **Funções Testadas**: 4
+  - `getValidationUser` (2 testes)
+  - `saveValidationUser` (9 testes)
+  - `updateValidationAdmin` (6 testes)
+  - `getPendingValidations` (5 testes)
+- **Status**: ✅ Todos passando
+- **Cobertura**:
+  - Sistema de validação de usuários e empresas
+  - Upload de documentos via multipart/form-data
+  - Parse de user como objeto ou string JSON
+  - Controle de acesso administrativo
+  - Aprovação/rejeição de validações
+  - Listagem de validações pendentes
+  - Tratamento de erros (400, 401, 404, 500)
+- **Funcionalidades Especiais**:
+  - Processa múltiplos documentos (PDF, imagens)
+  - Detecta validação existente (create vs update)
+  - Restrições de acesso apenas para admins
+  - Status: PENDING, APPROVED, REJECTED
 
 ## Padrões de Teste Utilizados
 
@@ -446,7 +467,7 @@ npm test -- --coverage
 **Desenvolvedor**: Time de Desenvolvimento Hopeshare
 **Framework**: Jest 29.7.0
 
-## 🚀 Como Executar
+## Como Executar
 
 ```bash
 # Todos os testes
@@ -459,7 +480,7 @@ npm run test:unit
 npm run test:watch
 ```
 
-## 🛠️ Estrutura dos Arquivos
+## Estrutura dos Arquivos
 
 ```
 src/
@@ -483,38 +504,38 @@ src/
     └── depositModel.js                        🔧 (mockado)
 ```
 
-## 🎯 Tipos de Testes Implementados
+## Tipos de Testes Implementados
 
-### ✅ Testes de Sucesso
+### Testes de Sucesso
 
 - Validam comportamento correto com dados válidos
 - Verificam retornos esperados (200, 201)
 - Confirmam chamadas aos models com parâmetros corretos
 
-### ❌ Testes de Erro
+### Testes de Erro
 
 - Validam tratamento de erros (400, 404, 500)
 - Testam mensagens de erro apropriadas
 - Verificam que models não são chamados em casos inválidos
 
-### 🔒 Testes de Autorização
+### Testes de Autorização
 
 - Validam acesso admin
 - Negam acesso não autorizado (401)
 - Verificam permissões antes de executar ações
 
-### 🧪 Testes de Validação
+### Testes de Validação
 
 - Campos obrigatórios
 - Valores inválidos
 - Edge cases (null, undefined, empty)
 
-### 🔗 Testes de Integração
+### Testes de Integração
 
 - Fluxos completos entre múltiplas funções
 - Validam comportamento sequencial
 
-## 🔧 Tecnologias e Ferramentas
+## Tecnologias e Ferramentas
 
 - **Jest**: Framework de testes
 - **jest.mock()**: Mock de módulos (campanhaModel, userModel, bankModel)
@@ -522,7 +543,7 @@ src/
 - **jest.clearAllMocks()**: Limpeza entre testes
 - **mockReturnThis()**: Chain de métodos (res.status().json())
 
-## 📝 Padrões Utilizados
+## Padrões Utilizados
 
 ### Estrutura de cada teste:
 
@@ -542,7 +563,7 @@ describe("nomeDaFunção", () => {
 - Reset de variáveis
 - Mock de console.error
 
-## 🎓 Boas Práticas Implementadas
+## Boas Práticas Implementadas
 
 1. ✅ **Isolamento**: Cada teste é independente
 2. ✅ **Clareza**: Nomes descritivos dos testes
@@ -551,17 +572,7 @@ describe("nomeDaFunção", () => {
 5. ✅ **Performance**: Testes rápidos (~0.6s total)
 6. ✅ **Manutenibilidade**: Código organizado e documentado
 
-## 📚 Próximos Passos
-
-Para expandir a cobertura de testes, considere criar testes para:
-
-- [ ] Testes de integração E2E
-- [ ] Testes de carga/performance
-- [ ] Testes de segurança e autorização
-
----
-
-### 📁 validationUserController.test.js
+### validationUserController.test.js
 
 **Total: 21 testes cobrindo 4 funções**
 
@@ -618,7 +629,7 @@ Para expandir a cobertura de testes, considere criar testes para:
 
 ---
 
-## 🎉 Conquistas
+## Conquistas
 
 - ✅ **200 testes** criados e funcionando
 - ✅ **4 controllers** com cobertura completa
