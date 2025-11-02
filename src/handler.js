@@ -11,6 +11,7 @@ const configReceiptController = require("./controllers/configReceiptController")
 const validationUserController = require("./controllers/validationUserController");
 const donationController = require("./controllers/donationController");
 const bankController = require("./controllers/bankController");
+const financialReportController = require("./controllers/financialReportController");
 const upload = require("./middleware/uploadMiddleware");
 
 app.post(
@@ -107,6 +108,17 @@ app.patch(
 app.get(
   "/campanha/admin/:user_id/deposito/pending",
   depositController.getSolicitacoesDepositoPendingAdmin
+);
+
+// ################## Rotas de Relatórios ###################
+app.post(
+  "/relatorio/:campanha_id/export",
+  financialReportController.exportReport
+);
+app.get("/relatorio/user/:user_id", financialReportController.listReports);
+app.delete(
+  "/relatorio/:financial_report_id",
+  financialReportController.deleteReport
 );
 
 // ################## Rotas de configuração de recebimento ###################

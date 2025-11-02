@@ -192,6 +192,56 @@ const replaceCampanhaImage = async (campanha_id, oldImageKey, newImageFile) => {
   }
 };
 
+// ========== UPLOADS DE RELATÓRIOS PDF ==========
+
+const uploadReportPDF = async (fileName, pdfBuffer) => {
+  try {
+    const key = `reports/${fileName}`;
+
+    // Detecta o tipo de conteúdo pelo nome do arquivo
+    const contentType = fileName.endsWith(".csv")
+      ? "text/csv; charset=utf-8"
+      : fileName.endsWith(".xml")
+      ? "application/xml; charset=utf-8"
+      : "application/pdf";
+
+    const uploadCommand = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: pdfBuffer,
+      ContentType: contentType,
+      Metadata: {
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    await s3Client.send(uploadCommand);
+
+    const publicUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`;
+
+    return {
+      url: publicUrl,
+      key: key,
+    };
+  } catch (error) {
+    throw new Error(`Falha ao fazer upload do arquivo: ${error.message}`);
+  }
+};
+
+const deleteReportPDF = async (key) => {
+  try {
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    await s3Client.send(deleteCommand);
+    return true;
+  } catch (error) {
+    throw new Error(`Falha ao deletar PDF: ${error.message}`);
+  }
+};
+
 module.exports = {
   deleteAllUserValidationDocuments,
   uploadValidationDocuments,
@@ -200,4 +250,7 @@ module.exports = {
   deleteImageCampanha,
   uploadCampanhaImage,
   replaceCampanhaImage,
+
+  uploadReportPDF,
+  deleteReportPDF,
 };

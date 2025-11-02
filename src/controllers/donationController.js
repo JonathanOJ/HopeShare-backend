@@ -1,6 +1,7 @@
 const donationModel = require("../models/donationModel");
 const campanhaModel = require("../models/campanhaModel");
 const mercadoPagoService = require("../services/mercadoPagoService");
+const userModel = require("../models/userModel");
 
 const createDonation = async (req, res) => {
   try {
@@ -28,7 +29,7 @@ const createDonation = async (req, res) => {
       });
     }
 
-    const user = await campanhaModel.getUserById(user_id);
+    const user = await userModel.findById(user_id);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -37,32 +38,26 @@ const createDonation = async (req, res) => {
     }
 
     // Dados do pagador (opcional)
-    const firstName = user.name.split(" ")[0];
-    const lastName = user.name.split(" ").slice(1).join(" ");
+    const firstName = user.username.split(" ")[0];
+    const lastName = user.username.split(" ").slice(1).join(" ");
 
     const payer = {
       email: user.email,
-      first_name: firstName || "",
-      last_name: lastName || "",
+      name: firstName || "",
+      surname: lastName || "",
     };
 
-    // Cria preferência de pagamento no Mercado Pago
     const preferenceData = {
       items: [
         {
           title: `Doação para: ${campanha.title}`,
           quantity: 1,
-          unit_price: parseFloat(value),
+          unit_price: parseFloat(amount),
           currency_id: "BRL",
         },
       ],
-      payer: payer || {},
-      back_urls: {
-        success: `${process.env.FRONTEND_URL}/donation/success`,
-        failure: `${process.env.FRONTEND_URL}/donation/failure`,
-        pending: `${process.env.FRONTEND_URL}/donation/pending`,
-      },
-      notification_url: `${process.env.API_URL}/webhooks/mercadopago`,
+      payer: payer,
+      auto_return: "approved",
       external_reference: campanha_id, // Para identificar a campanha no webhook
       metadata: {
         user_id,
@@ -75,21 +70,9 @@ const createDonation = async (req, res) => {
       preferenceData
     );
 
-    await donationModel.createDonation({
-      user_id,
-      campanha_id,
-      payment_id: preference.id, // ID da preferência
-      payment_method: "",
-      title_campanha: campanha.title,
-      amount: parseFloat(amount),
-      status: "pending",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      refund_requested_at: null,
-    });
-
     res.status(201).json({
       data: {
+        preference_id: preference.id,
         init_point: preference.init_point, // URL PRODUÇÃO
         sandbox_init_point: preference.sandbox_init_point, // URL TESTE
       },
@@ -178,9 +161,9 @@ const refundDonation = async (req, res) => {
 // Webhook do Mercado Pago
 const mercadoPagoWebhook = async (req, res) => {
   try {
-    const { type, data } = req.body;
+    const { topic, resource } = req.body;
 
-    console.log("📬 Webhook recebido:", { type, data });
+    console.log("📬 Webhook recebido:", { topic, resource });
 
     // 1. Valida assinatura (recomendado em produção)
     const isValid = mercadoPagoService.validateWebhookSignature(
@@ -193,30 +176,61 @@ const mercadoPagoWebhook = async (req, res) => {
       // Em produção, retorne 401 ou ignore
     }
 
-    if (type === "payment") {
+    if (topic === "payment") {
+      // O resource pode ser a URL completa ou só o ID
+      const payment_id = resource.includes("/")
+        ? resource.split("/").pop()
+        : resource;
+
       const paymentData = await mercadoPagoService.processWebhookNotification({
-        type,
-        data,
+        topic,
+        resource: payment_id,
       });
 
       if (!paymentData) {
         return res.status(200).json({ success: true });
       }
 
-      // Busca doação no banco
-      const donation = await donationModel.findByPaymentId(
+      let donation = await donationModel.findById(
         paymentData.payment_id.toString()
       );
 
+      // Se a doação não existe, cria uma nova baseada nos dados do pagamento
       if (!donation) {
-        console.warn(
-          `⚠️  Doação não encontrada para payment_id: ${paymentData.payment_id}`
-        );
-        return res.status(200).json({ success: true });
-      }
+        const campanha_id = paymentData.external_reference;
+        const campanha = await campanhaModel.findById(campanha_id);
 
-      // Atualiza status da doação
-      await donationModel.updateStatus(donation.payment_id, paymentData.status);
+        if (!campanha) {
+          console.warn(`⚠️  Campanha não encontrada: ${campanha_id}`);
+          return res.status(200).json({ success: true });
+        }
+
+        const user_id = paymentData.metadata?.user_id;
+
+        if (!user_id) {
+          console.warn(`⚠️  user_id não encontrado nos metadados do pagamento`);
+          return res.status(200).json({ success: true });
+        }
+
+        donation = await donationModel.createDonation({
+          user_id,
+          campanha_id,
+          payment_id: paymentData.payment_id.toString(),
+          payment_method: paymentData.payment_method_id || "",
+          title_campanha: campanha.title,
+          amount: parseFloat(paymentData.transaction_amount),
+          status: paymentData.status,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          refund_requested_at: null,
+        });
+      } else {
+        // Atualiza status da doação existente
+        await donationModel.updateStatus(
+          donation.payment_id,
+          paymentData.status
+        );
+      }
 
       if (paymentData.status === "approved") {
         await updateCampanhaDonation(donation.campanha_id, donation);

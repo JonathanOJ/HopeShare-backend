@@ -1,12 +1,25 @@
-const { MercadoPagoConfig, Payment, Preference } = require("mercadopago");
+const {
+  MercadoPagoConfig,
+  Payment,
+  Preference,
+  PaymentRefund,
+} = require("mercadopago");
 
 // Configuração do cliente Mercado Pago
+const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+const isTestMode = accessToken?.startsWith("TEST-");
+
+console.log(
+  `🔑 Mercado Pago configurado em modo: ${isTestMode ? "TESTE" : "PRODUÇÃO"}`
+);
+
 const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
+  accessToken: accessToken,
 });
 
 const payment = new Payment(client);
 const preference = new Preference(client);
+const paymentRefund = new PaymentRefund(client);
 
 const createPayment = async (donationData) => {
   const {
@@ -25,7 +38,7 @@ const createPayment = async (donationData) => {
       description,
       payment_method_id,
       installments: parseInt(installments),
-      token, // Token do cartão gerado pelo frontend
+      token,
       payer: {
         email: payer.email,
         first_name: payer.first_name,
@@ -37,13 +50,12 @@ const createPayment = async (donationData) => {
             }
           : undefined,
       },
-      notification_url: metadata?.notification_url, // URL do webhook
+      notification_url: metadata?.notification_url,
       metadata: metadata || {},
     };
 
     const result = await payment.create({ body: paymentData });
 
-    console.log("✅ Pagamento criado:", result.id);
     return result;
   } catch (error) {
     console.error("❌ Erro ao criar pagamento:", error);
@@ -52,14 +64,7 @@ const createPayment = async (donationData) => {
 };
 
 const createPaymentPreference = async (preferenceData) => {
-  const {
-    items,
-    payer,
-    back_urls,
-    notification_url,
-    metadata,
-    external_reference,
-  } = preferenceData;
+  const { items, payer, metadata, external_reference } = preferenceData;
 
   try {
     const preferencePayload = {
@@ -69,27 +74,19 @@ const createPaymentPreference = async (preferenceData) => {
         unit_price: parseFloat(item.unit_price),
         currency_id: item.currency_id || "BRL",
       })),
-      payer: payer
-        ? {
-            name: payer.name,
-            surname: payer.surname,
-            email: payer.email,
-          }
-        : undefined,
-      back_urls: back_urls || {
+      payer: payer && payer.email ? payer : undefined,
+      back_urls: {
         success: `${process.env.FRONTEND_URL}/donation/success`,
         failure: `${process.env.FRONTEND_URL}/donation/failure`,
         pending: `${process.env.FRONTEND_URL}/donation/pending`,
       },
-      notification_url,
-      auto_return: "approved",
+      notification_url: `${process.env.API_URL}/webhooks/mercadopago`,
       external_reference,
       metadata,
     };
 
     const result = await preference.create({ body: preferencePayload });
 
-    console.log("✅ Preferência criada:", result.id);
     return result;
   } catch (error) {
     console.error("❌ Erro ao criar preferência:", error);
@@ -109,12 +106,20 @@ const getPayment = async (paymentId) => {
 
 const refundPayment = async (paymentId, amount = null) => {
   try {
-    // Cria o reembolso
-    const result = await payment.refund({
-      id: paymentId,
-    });
+    const refundOptions = {
+      payment_id: paymentId,
+    };
 
-    console.log(`✅ Reembolso criado para pagamento ${paymentId}`);
+    if (amount) {
+      refundOptions.body = {
+        amount: parseFloat(amount),
+      };
+    } else {
+      refundOptions.body = {};
+    }
+
+    const result = await paymentRefund.create(refundOptions);
+
     return result;
   } catch (error) {
     console.error(`❌ Erro ao reembolsar pagamento ${paymentId}:`, error);
@@ -124,8 +129,9 @@ const refundPayment = async (paymentId, amount = null) => {
 
 const cancelPayment = async (paymentId) => {
   try {
-    const result = await payment.cancel({ id: paymentId });
-    console.log(`✅ Pagamento ${paymentId} cancelado`);
+    const result = await payment.cancel({
+      id: paymentId,
+    });
     return result;
   } catch (error) {
     console.error(`❌ Erro ao cancelar pagamento ${paymentId}:`, error);
@@ -148,28 +154,25 @@ const validateWebhookSignature = (headers, body) => {
 
 // Processa notificação do webhook
 const processWebhookNotification = async (notification) => {
-  const { type, data } = notification;
+  const { topic, resource } = notification;
 
   try {
-    if (type === "payment") {
-      const paymentId = data.id;
-      const paymentData = await getPayment(paymentId);
-
-      console.log(
-        `📬 Webhook recebido para pagamento ${paymentId}:`,
-        paymentData.status
-      );
+    if (topic === "payment") {
+      const payment_id = resource;
+      const paymentData = await getPayment(payment_id);
 
       return {
-        payment_id: paymentId,
+        payment_id: payment_id,
         status: paymentData.status,
         transaction_amount: paymentData.transaction_amount,
         external_reference: paymentData.external_reference,
         date_approved: paymentData.date_approved,
+        payment_method_id: paymentData.payment_method_id,
+        metadata: paymentData.metadata,
       };
     }
 
-    console.warn(`⚠️  Tipo de notificação não suportado: ${type}`);
+    console.warn(`⚠️  Tipo de notificação não suportado: ${topic}`);
     return null;
   } catch (error) {
     console.error("❌ Erro ao processar webhook:", error);

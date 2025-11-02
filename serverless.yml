@@ -10,6 +10,7 @@ custom:
   validationUserTableName: hopeshare-validation-user
   donationTableName: hopeshare-donation
   reportsTableName: hopeshare-reports
+  financeReportTableName: hopeshare-finance-reports-v2
   configReceiptTableName: hopeshare-config-receipt
   bankTableName: hopeshare-bank
 
@@ -34,12 +35,19 @@ provider:
             - Fn::GetAtt: [ValidationUserTable, Arn]
             - Fn::GetAtt: [DonationTable, Arn]
             - Fn::GetAtt: [ReportsTable, Arn]
+            - Fn::GetAtt: [FinanceReportTable, Arn]
             - Fn::GetAtt: [ConfigReceiptTable, Arn]
             - Fn::GetAtt: [BankTable, Arn]
             # Permissões para GSI indexes da UsersTable
             - Fn::Join:
                 - "/"
                 - - Fn::GetAtt: [UsersTable, Arn]
+                  - "index"
+                  - "*"
+            # Permissões para GSI indexes da FinanceReportTable
+            - Fn::Join:
+                - "/"
+                - - Fn::GetAtt: [FinanceReportTable, Arn]
                   - "index"
                   - "*"
   environment:
@@ -49,6 +57,7 @@ provider:
     VALIDATION_USER_TABLE: ${self:custom.validationUserTableName}
     DONATION_TABLE: ${self:custom.donationTableName}
     REPORTS_TABLE: ${self:custom.reportsTableName}
+    FINANCE_REPORT_TABLE: ${self:custom.financeReportTableName}
     CONFIG_RECEIPT_TABLE: ${self:custom.configReceiptTableName}
     BANK_TABLE: ${self:custom.bankTableName}
     # Cloudflare R2 (S3-compatible) - Use Serverless Dashboard variables ou AWS Systems Manager Parameter Store
@@ -169,6 +178,35 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.reportsTableName}
+
+    FinanceReportTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: financial_report_id
+            AttributeType: S
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: campanha_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: financial_report_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: user_id-index
+            KeySchema:
+              - AttributeName: user_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: campanha_id-index
+            KeySchema:
+              - AttributeName: campanha_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.financeReportTableName}
 
     ConfigReceiptTable:
       Type: AWS::DynamoDB::Table
