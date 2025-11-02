@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=__tests__",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
   },
@@ -32,7 +34,29 @@
   },
   "devDependencies": {
     "eslint": "^8.22.0",
+    "jest": "^29.7.0",
     "nodemon": "^2.0.19",
     "serverless": "^4.2.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js",
+      "!src/handler.js",
+      "!src/**/__tests__/**"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    }
   }
 }
