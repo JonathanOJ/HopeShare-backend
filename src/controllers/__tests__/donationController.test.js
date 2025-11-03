@@ -499,7 +499,15 @@ describe("donationController", () => {
       donationModel.findById.mockResolvedValue(null);
       campanhaModel.findById.mockResolvedValue(mockCampanha);
       donationModel.createDonation.mockResolvedValue(mockDonation);
-      campanhaModel.updateCampanha.mockResolvedValue({});
+      campanhaModel.updateValueDonated.mockResolvedValue({});
+      campanhaModel.updateUsersDonated.mockResolvedValue({});
+      userModel.findById.mockResolvedValue({
+        user_id: "user123",
+        username: "Test User",
+        imagem: { url: "http://image.url" },
+      });
+      userModel.updateTotalCampanhasDonated.mockResolvedValue({});
+      userModel.updateTotalDonated.mockResolvedValue({});
 
       await donationController.mercadoPagoWebhook(req, res);
 
@@ -510,7 +518,8 @@ describe("donationController", () => {
         resource: "123",
       });
       expect(donationModel.createDonation).toHaveBeenCalled();
-      expect(campanhaModel.updateCampanha).toHaveBeenCalled();
+      expect(campanhaModel.updateValueDonated).toHaveBeenCalled();
+      expect(campanhaModel.updateUsersDonated).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ success: true });
     });
@@ -523,6 +532,7 @@ describe("donationController", () => {
 
       const mockDonation = {
         payment_id: "123",
+        user_id: "user123",
         campanha_id: "camp123",
         amount: 50,
         status: "pending",
@@ -539,7 +549,15 @@ describe("donationController", () => {
       );
       donationModel.findById.mockResolvedValue(mockDonation);
       donationModel.updateStatus.mockResolvedValue({});
-      campanhaModel.updateCampanha.mockResolvedValue({});
+      campanhaModel.updateValueDonated.mockResolvedValue({});
+      campanhaModel.updateUsersDonated.mockResolvedValue({});
+      userModel.findById.mockResolvedValue({
+        user_id: "user123",
+        username: "Test User",
+        imagem: { url: "http://image.url" },
+      });
+      userModel.updateTotalCampanhasDonated.mockResolvedValue({});
+      userModel.updateTotalDonated.mockResolvedValue({});
 
       await donationController.mercadoPagoWebhook(req, res);
 
@@ -547,7 +565,8 @@ describe("donationController", () => {
         "123",
         "approved"
       );
-      expect(campanhaModel.updateCampanha).toHaveBeenCalled();
+      expect(campanhaModel.updateValueDonated).toHaveBeenCalled();
+      expect(campanhaModel.updateUsersDonated).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(200);
     });
 

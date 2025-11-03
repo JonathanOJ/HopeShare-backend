@@ -211,6 +211,48 @@ const createCampanha = async (campanha) => {
   }
 };
 
+const updateUsersDonated = async (campanha_id, user_donated) => {
+  const params = {
+    TableName: CAMPANHA_TABLE,
+    Key: { campanha_id },
+    UpdateExpression:
+      "SET  users_donated = list_append(if_not_exists(users_donated, :empty_list), :user_donated)",
+    ExpressionAttributeValues: {
+      ":user_donated": [user_donated],
+      ":empty_list": [],
+    },
+    ReturnValues: "ALL_NEW",
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new UpdateCommand(params));
+    return result.Attributes;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
+const updateValueDonated = async (campanha_id, amount_value) => {
+  const params = {
+    TableName: CAMPANHA_TABLE,
+    Key: { campanha_id },
+    UpdateExpression: "SET value_donated = value_donated + :donated_value",
+    ExpressionAttributeValues: {
+      ":donated_value": amount_value,
+    },
+    ReturnValues: "ALL_NEW",
+  };
+
+  try {
+    const result = await dynamoDbClient.send(new UpdateCommand(params));
+    return result.Attributes;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
 const updateCampanha = async (campanha) => {
   const { campanha_id, new_file_image, ...updateFields } = campanha;
 
@@ -482,4 +524,6 @@ module.exports = {
   suspendCampanha,
   reactivateCampanha,
   findAllByIds,
+  updateUsersDonated,
+  updateValueDonated,
 };

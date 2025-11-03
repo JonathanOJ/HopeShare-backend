@@ -250,10 +250,24 @@ const mercadoPagoWebhook = async (req, res) => {
 
 async function updateCampanhaDonation(campanha_id, donation) {
   try {
-    await campanhaModel.updateCampanha({
-      campanha_id,
-      value_donated: donation.amount,
+    await campanhaModel.updateValueDonated(campanha_id, donation.amount);
+    await userModel.updateTotalCampanhasDonated({ user_id: donation.user_id });
+    await userModel.updateTotalDonated({
+      user_id: donation.user_id,
+      donated_value: donation.amount,
     });
+
+    const user = await userModel.findById(donation.user_id);
+
+    const user_donated = {
+      user_id: donation.user_id,
+      campanha_id: campanha_id,
+      username: user.username,
+      donated_value: donation.amount,
+      image: user.imagem?.url || "",
+    };
+
+    await campanhaModel.updateUsersDonated(campanha_id, user_donated);
 
     console.log(
       `✅ Campanha ${campanha_id} atualizada com doação de R$ ${donation.amount}`
