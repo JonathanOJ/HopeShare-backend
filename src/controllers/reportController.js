@@ -112,11 +112,13 @@ const getDenunciasGrouped = async (req, res) => {
 
     const campanhas = await campanhaModel.findAllByIds(campanhasIds);
 
-    for (const campanha of campanhas) {
-      const campanhaData = campanhasMap.get(campanha.campanha_id);
-      if (campanhaData) {
-        campanhaData.campanha_title = campanha.title;
-        campanhaData.is_suspended = campanha.status === "SUSPENDED";
+    if (campanhas && campanhas.length > 0) {
+      for (const campanha of campanhas) {
+        const campanhaData = campanhasMap.get(campanha.campanha_id);
+        if (campanhaData) {
+          campanhaData.campanha_title = campanha.title;
+          campanhaData.is_suspended = campanha.status === "SUSPENDED";
+        }
       }
     }
 
